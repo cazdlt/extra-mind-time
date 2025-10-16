@@ -1,0 +1,10 @@
+// Force all Android subprojects to use compileSdk 34
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty("android")) {
+            android {
+                compileSdkVersion 34
+            }
+        }
+    }
+}

@@ -35,7 +35,10 @@ class _AppSelectionScreenState extends State<AppSelectionScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final apps = await InstalledApps.getInstalledApps(false, true);
+      final apps = await InstalledApps.getInstalledApps(
+        excludeSystemApps: false,
+        withIcon: true,
+      );
 
       // Sort apps alphabetically by name
       apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
