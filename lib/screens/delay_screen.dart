@@ -5,12 +5,14 @@ class DelayScreen extends StatefulWidget {
   final int delaySeconds;
   final String mindfulMessage;
   final VoidCallback onComplete;
+  final Color backgroundColor;
 
   const DelayScreen({
     super.key,
     required this.delaySeconds,
     required this.mindfulMessage,
     required this.onComplete,
+    required this.backgroundColor,
   });
 
   @override
@@ -68,7 +70,7 @@ class _DelayScreenState extends State<DelayScreen>
     final progress = (_remainingSeconds / widget.delaySeconds);
 
     return Scaffold(
-      backgroundColor: Colors.deepPurple.shade900,
+      backgroundColor: backgroundColor,
       body: SafeArea(
         child: Container(
           decoration: BoxDecoration(
@@ -76,9 +78,9 @@ class _DelayScreenState extends State<DelayScreen>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.deepPurple.shade900,
-                Colors.deepPurple.shade700,
-                Colors.purple.shade600,
+                backgroundColor,
+                backgroundColor.withOpacity(0.8),
+                backgroundColor.withOpacity(0.6),
               ],
             ),
           ),

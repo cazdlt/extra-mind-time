@@ -14,8 +14,11 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<String> _selectedApps = [];
+  Map<String, String> _appNames = {};
   int _delaySeconds = 5;
   String _mindfulMessage = "Take a moment to breathe and be present.";
+  Color _backgroundColor = Colors.deepPurple;
+  int _recheckIntervalMinutes = 30;
   bool _isMonitoring = false;
   bool _isLoading = true;
 
@@ -35,16 +38,27 @@ class _HomeScreenState extends State<HomeScreen> {
         ? List<String>.from(json.decode(appsJson))
         : <String>[];
 
+    final appNamesJson = prefs.getString('app_names');
+    final appNames = appNamesJson != null
+        ? Map<String, String>.from(json.decode(appNamesJson))
+        : <String, String>{};
+
     final delay = prefs.getInt('delay_seconds') ?? 5;
     final message =
         prefs.getString('mindful_message') ??
         "Take a moment to breathe and be present.";
+    final backgroundColorValue =
+        prefs.getInt('background_color') ?? Colors.deepPurple.value;
+    final recheckInterval = prefs.getInt('recheck_interval_minutes') ?? 30;
     final monitoring = prefs.getBool('is_monitoring') ?? false;
 
     setState(() {
       _selectedApps = apps;
+      _appNames = appNames;
       _delaySeconds = delay;
       _mindfulMessage = message;
+      _backgroundColor = Color(backgroundColorValue);
+      _recheckIntervalMinutes = recheckInterval;
       _isMonitoring = monitoring;
       _isLoading = false;
     });
@@ -57,8 +71,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('selected_apps', json.encode(_selectedApps));
+    await prefs.setString('app_names', json.encode(_appNames));
     await prefs.setInt('delay_seconds', _delaySeconds);
     await prefs.setString('mindful_message', _mindfulMessage);
+    await prefs.setInt('background_color', _backgroundColor.value);
+    await prefs.setInt('recheck_interval_minutes', _recheckIntervalMinutes);
     await prefs.setBool('is_monitoring', _isMonitoring);
   }
 
@@ -100,12 +117,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AppSelectionScreen(selectedApps: _selectedApps),
+        builder: (context) => AppSelectionScreen(
+          selectedApps: _selectedApps,
+          appNames: _appNames,
+        ),
       ),
     );
 
-    if (result != null && result is List<String>) {
-      setState(() => _selectedApps = result);
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() {
+        _selectedApps = List<String>.from(result['selectedApps']);
+        _appNames = Map<String, String>.from(result['appNames']);
+      });
       await _saveSettings();
     }
   }
@@ -117,6 +140,8 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context) => SettingsScreen(
           delaySeconds: _delaySeconds,
           mindfulMessage: _mindfulMessage,
+          backgroundColor: _backgroundColor,
+          recheckIntervalMinutes: _recheckIntervalMinutes,
         ),
       ),
     );
@@ -125,6 +150,8 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _delaySeconds = result['delaySeconds'] as int;
         _mindfulMessage = result['mindfulMessage'] as String;
+        _backgroundColor = result['backgroundColor'] as Color;
+        _recheckIntervalMinutes = result['recheckIntervalMinutes'] as int;
       });
       await _saveSettings();
     }
@@ -289,13 +316,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: _selectedApps
                                 .map(
                                   (packageName) => ListTile(
-                                    leading: const Icon(
-                                      Icons.android,
-                                      color: Colors.green,
-                                    ),
+                                    leading: _buildAppIcon(packageName),
                                     title: Text(
-                                      packageName,
+                                      _appNames[packageName] ?? packageName,
                                       style: const TextStyle(fontSize: 14),
+                                    ),
+                                    subtitle: Text(
+                                      packageName,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey,
+                                      ),
                                     ),
                                     dense: true,
                                   ),
@@ -376,5 +407,29 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildAppIcon(String packageName) {
+    // Try to get the base64 encoded icon data
+    final iconData = _appNames['${packageName}_icon'];
+
+    if (iconData != null && iconData.isNotEmpty) {
+      try {
+        final bytes = base64Decode(iconData);
+        return Image.memory(
+          bytes,
+          width: 40,
+          height: 40,
+          errorBuilder: (context, error, stackTrace) {
+            return const Icon(Icons.android, size: 40, color: Colors.green);
+          },
+        );
+      } catch (e) {
+        // Fallback to default icon if decoding fails
+      }
+    }
+
+    // Fallback to default icon
+    return const Icon(Icons.android, size: 40, color: Colors.green);
   }
 }

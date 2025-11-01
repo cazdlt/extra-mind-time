@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:installed_apps/app_info.dart';
+import 'dart:convert';
 
 class AppSelectionScreen extends StatefulWidget {
   final List<String> selectedApps;
+  final Map<String, String> appNames;
 
-  const AppSelectionScreen({super.key, required this.selectedApps});
+  const AppSelectionScreen({
+    super.key,
+    required this.selectedApps,
+    this.appNames = const {},
+  });
 
   @override
   State<AppSelectionScreen> createState() => _AppSelectionScreenState();
@@ -14,6 +20,7 @@ class AppSelectionScreen extends StatefulWidget {
 class _AppSelectionScreenState extends State<AppSelectionScreen> {
   List<AppInfo> _installedApps = [];
   List<String> _selectedPackages = [];
+  Map<String, String> _appNames = {};
   bool _isLoading = true;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
@@ -22,6 +29,7 @@ class _AppSelectionScreenState extends State<AppSelectionScreen> {
   void initState() {
     super.initState();
     _selectedPackages = List.from(widget.selectedApps);
+    _appNames = Map.from(widget.appNames);
     _loadInstalledApps();
   }
 
@@ -39,6 +47,11 @@ class _AppSelectionScreenState extends State<AppSelectionScreen> {
         excludeSystemApps: false,
         withIcon: true,
       );
+
+      // Debug: Print number of apps and how many have icons
+      print('Loaded ${apps.length} apps');
+      int appsWithIcons = apps.where((app) => app.icon != null).length;
+      print('Apps with icons: $appsWithIcons');
 
       // Sort apps alphabetically by name
       apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
@@ -82,7 +95,10 @@ class _AppSelectionScreenState extends State<AppSelectionScreen> {
   }
 
   void _saveSelection() {
-    Navigator.pop(context, _selectedPackages);
+    Navigator.pop(context, {
+      'selectedApps': _selectedPackages,
+      'appNames': _appNames,
+    });
   }
 
   @override
@@ -207,6 +223,7 @@ class _AppSelectionScreenState extends State<AppSelectionScreen> {
                         color: Colors.green,
                       );
 
+                      // Debug: Check if icon is available
                       if (app.icon != null) {
                         icon = Image.memory(
                           app.icon!,
@@ -243,7 +260,10 @@ class _AppSelectionScreenState extends State<AppSelectionScreen> {
                           ),
                           subtitle: Text(
                             packageName,
-                            style: const TextStyle(fontSize: 12),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -270,7 +290,23 @@ class _AppSelectionScreenState extends State<AppSelectionScreen> {
       ),
       floatingActionButton: _selectedPackages.isNotEmpty
           ? FloatingActionButton.extended(
-              onPressed: _saveSelection,
+              onPressed: () {
+                // Update app names and icons for selected apps
+                for (final app in _installedApps) {
+                  final packageName = app.packageName ?? '';
+                  if (_selectedPackages.contains(packageName) &&
+                      app.name != null) {
+                    _appNames[packageName] = app.name!;
+                    // Store icon data as base64 string
+                    if (app.icon != null) {
+                      _appNames['${packageName}_icon'] = base64Encode(
+                        app.icon!,
+                      );
+                    }
+                  }
+                }
+                _saveSelection();
+              },
               backgroundColor: Colors.deepPurple,
               icon: const Icon(Icons.check, color: Colors.white),
               label: const Text(

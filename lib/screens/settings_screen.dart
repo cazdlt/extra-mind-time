@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 class SettingsScreen extends StatefulWidget {
   final int delaySeconds;
   final String mindfulMessage;
+  final Color backgroundColor;
+  final int recheckIntervalMinutes;
 
   const SettingsScreen({
     super.key,
-    required this.delaySeconds,
-    required this.mindfulMessage,
+    this.delaySeconds = 5,
+    this.mindfulMessage = "Take a moment to breathe and be present.",
+    this.backgroundColor = Colors.blue,
+    this.recheckIntervalMinutes = 30,
   });
 
   @override
@@ -17,6 +21,8 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   late int _delaySeconds;
   late TextEditingController _messageController;
+  late Color _backgroundColor;
+  late int _recheckIntervalMinutes;
 
   final List<String> _defaultMessages = [
     "Take a moment to breathe and be present.",
@@ -34,6 +40,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _delaySeconds = widget.delaySeconds;
     _messageController = TextEditingController(text: widget.mindfulMessage);
+    _backgroundColor = widget.backgroundColor;
+    _recheckIntervalMinutes = widget.recheckIntervalMinutes > 30
+        ? 30
+        : widget.recheckIntervalMinutes;
   }
 
   @override
@@ -56,6 +66,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Navigator.pop(context, {
       'delaySeconds': _delaySeconds,
       'mindfulMessage': _messageController.text.trim(),
+      'backgroundColor': _backgroundColor,
+      'recheckIntervalMinutes': _recheckIntervalMinutes > 30
+          ? 30
+          : _recheckIntervalMinutes,
     });
   }
 
@@ -63,6 +77,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _messageController.text = message;
     });
+  }
+
+  Widget _buildColorOption(Color color, String name) {
+    final isSelected = _backgroundColor.value == color.value;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _backgroundColor = color;
+        });
+      },
+      child: Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? Colors.white : Colors.grey.shade300,
+            width: isSelected ? 3 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
+        ),
+        child: isSelected
+            ? const Icon(Icons.check, color: Colors.white, size: 24)
+            : null,
+      ),
+    );
   }
 
   @override
@@ -150,6 +200,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         Text(
                           '30s',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Re-check Interval Card
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.update, color: Colors.orange),
+                        SizedBox(width: 12),
+                        Text(
+                          'Re-check Interval',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'How long before showing the mindful screen again for the same app?',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '$_recheckIntervalMinutes',
+                          style: const TextStyle(
+                            fontSize: 48,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.deepOrange,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'minutes',
+                          style: TextStyle(fontSize: 18, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      value: _recheckIntervalMinutes
+                          .clamp(1.0, 30.0)
+                          .toDouble(),
+                      min: 1,
+                      max: 30,
+                      divisions: 29,
+                      label: '$_recheckIntervalMinutes minutes',
+                      activeColor: Colors.deepOrange,
+                      onChanged: (value) {
+                        setState(() {
+                          _recheckIntervalMinutes = value.toInt();
+                        });
+                      },
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '1m',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          '30m',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
@@ -346,6 +481,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const Text(
                             'seconds',
                             style: TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Background Color Card
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.palette, color: Colors.green),
+                        SizedBox(width: 12),
+                        Text(
+                          'Background Color',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Choose the background color for the mindful screen',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        _buildColorOption(Colors.deepPurple, 'Deep Purple'),
+                        _buildColorOption(Colors.indigo, 'Indigo'),
+                        _buildColorOption(Colors.blue, 'Blue'),
+                        _buildColorOption(Colors.teal, 'Teal'),
+                        _buildColorOption(Colors.green, 'Green'),
+                        _buildColorOption(Colors.orange, 'Orange'),
+                        _buildColorOption(Colors.red, 'Red'),
+                        _buildColorOption(Colors.pink, 'Pink'),
+                        _buildColorOption(Colors.grey[800]!, 'Dark Grey'),
+                        _buildColorOption(Colors.black, 'Black'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _backgroundColor,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(Icons.preview, size: 40, color: Colors.white),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Preview',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
