@@ -97,7 +97,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                   ),
                   const SizedBox(height: 24),
                   const Text(
-                    'Welcome to Mindful Time',
+                    'Welcome to Extra Mind Time',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),

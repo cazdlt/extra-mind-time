@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
 
     <application
-        android:label="extra_mind_time"
+        android:label="Extra Mind Time"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -48,7 +48,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="App monitoring for mindful usage"/>
+                android:value="App monitoring for Extra Mind Time"/>
         </service>
 
         <!-- Delay Screen Activity -->

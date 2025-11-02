@@ -1,6 +1,6 @@
 # Android Device Installation Guide
 
-This guide will help you install the Mindful Time app on your physical Android device.
+This guide will help you install the Extra Mind Time app on your physical Android device.
 
 ## Compatibility
 
@@ -109,7 +109,7 @@ When you first open the app:
 
 1. **Usage Stats Access**
    - Tap "Grant Permission"
-   - Find "Mindful Time" in the list
+   - Find "Extra Mind Time" in the list
    - Enable "Permit usage access"
    - Press back to return to the app
 
@@ -136,7 +136,7 @@ When you first open the app:
 
 For the app to work properly in the background:
 
-1. Go to **Settings** → **Apps** → **Mindful Time**
+1. Go to **Settings** → **Apps** → **Extra Mind Time**
 2. Tap **Battery**
 3. Select **"Unrestricted"** or **"Don't optimize"**
 
@@ -159,21 +159,21 @@ Android 15 works perfectly with this app. Notes:
 Some manufacturers (Xiaomi, Huawei, Samsung, etc.) have aggressive battery optimization:
 
 **Xiaomi/MIUI:**
-- Settings → Apps → Manage apps → Mindful Time → Battery saver → No restrictions
-- Settings → Apps → Manage apps → Mindful Time → Autostart → Enable
+- Settings → Apps → Manage apps → Extra Mind Time → Battery saver → No restrictions
+- Settings → Apps → Manage apps → Extra Mind Time → Autostart → Enable
 
 **Huawei/EMUI:**
-- Settings → Battery → App launch → Mindful Time → Manage manually
+- Settings → Battery → App launch → Extra Mind Time → Manage manually
 - Enable all toggles (Auto-launch, Secondary launch, Run in background)
 
 **Samsung:**
-- Settings → Apps → Mindful Time → Battery → Allow background activity
-- Settings → Device care → Battery → Background usage limits → Never sleeping apps → Add Mindful Time
+- Settings → Apps → Extra Mind Time → Battery → Allow background activity
+- Settings → Device care → Battery → Background usage limits → Never sleeping apps → Add Extra Mind Time
 
 **Motorola:**
-- Settings → Apps → Mindful Time → Battery → Battery optimization → Don't optimize
-- Settings → Apps → Mindful Time → Battery → Background activity → Allow
-- Moto app (if installed) → Battery → Battery optimization → Add Mindful Time to exceptions
+- Settings → Apps → Extra Mind Time → Battery → Battery optimization → Don't optimize
+- Settings → Apps → Extra Mind Time → Battery → Background activity → Allow
+- Moto app (if installed) → Battery → Battery optimization → Add Extra Mind Time to exceptions
 - Note: Motorola devices typically have cleaner Android and fewer restrictions than other manufacturers
 
 ## Troubleshooting
@@ -221,7 +221,7 @@ flutter logs
 
 ### From Device
 
-1. Settings → Apps → Mindful Time
+1. Settings → Apps → Extra Mind Time
 2. Tap **Uninstall**
 
 ### Using ADB

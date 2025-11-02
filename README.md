@@ -1,6 +1,6 @@
-# Mindful Time - Android App Usage Manager
+# Extra Mind Time - Android App Usage Manager
 
-A Flutter app for Android that helps you be more intentional with your app usage by showing a mindful delay screen when you open selected apps.
+A Flutter app for Android that helps you be more intentional with your app usage by showing a delay screen when you open selected apps.
 
 ## Features
 
@@ -8,15 +8,15 @@ A Flutter app for Android that helps you be more intentional with your app usage
 - 📱 **App Selection**: Choose which apps you want to monitor from your installed applications
 - ⏱️ **Customizable Delay**: Set delay duration from 1 to 30 seconds
 - 💭 **Mindful Messages**: Customize or choose from default mindful messages
-- 🎨 **Beautiful UI**: Modern Material 3 design with smooth animations
-- 🔄 **Real-time Monitoring**: Background service monitors selected app launches
+🎨 **Beautiful UI**: Modern Material 3 design with smooth animations
+🔄 **Real-time Monitoring**: Background service monitors selected app launches
 
 ## How It Works
 
-1. **Select Apps**: Choose which apps you want to add a mindful pause to
-2. **Configure Settings**: Set your delay duration and choose a mindful message
+1. **Select Apps**: Choose which apps you want to add an intentional pause to
+2. **Configure Settings**: Set your delay duration and choose a message
 3. **Start Monitoring**: Enable the monitoring service
-4. **Mindful Pause**: When you open a selected app, you'll see a beautiful delay screen with your chosen message and a countdown timer
+4. **Intentional Pause**: When you open a selected app, you'll see a beautiful delay screen with your chosen message and a countdown timer
 
 ## Permissions Required
 
@@ -66,7 +66,7 @@ Or use the provided script:
 - Set via the Settings screen
 - Uses a smooth slider interface
 
-### Mindful Messages
+### Messages
 
 Choose from default messages or create your own:
 - "Take a moment to breathe and be present."
@@ -74,7 +74,7 @@ Choose from default messages or create your own:
 - "Remember your intentions for today."
 - "What matters most to you in this moment?"
 - "Take a deep breath before continuing."
-- "Are you choosing this mindfully?"
+- "Are you choosing this intentionally?"
 - "Stay present. Stay focused."
 - "This moment is all you have."
 
@@ -97,7 +97,7 @@ lib/
 │   ├── home_screen.dart          # Main dashboard
 │   ├── app_selection_screen.dart # App selection interface
 │   ├── settings_screen.dart      # Settings configuration
-│   └── delay_screen.dart         # Mindful delay screen
+│   └── delay_screen.dart         # Intentional delay screen
 ├── services/
 │   └── app_monitor_service.dart  # Background monitoring service
 └── models/
@@ -107,7 +107,7 @@ lib/
 ### Key Components
 
 1. **AppMonitorService**: Periodically checks for app launches and triggers the delay screen
-2. **DelayScreen**: Full-screen overlay with countdown timer and mindful message
+2. **DelayScreen**: Full-screen overlay with countdown timer and intentional message
 3. **PermissionsScreen**: Guides users through permission setup
 4. **HomeScreen**: Central dashboard for monitoring control and configuration
 
@@ -127,9 +127,9 @@ The app requires the following manifest entries:
 ## Usage Tips
 
 1. **Start Small**: Begin with 1-2 apps that you want to be more mindful about
-2. **Adjust Duration**: Find a delay time that works for you - not too short, not too long
-3. **Personalize Messages**: Create messages that resonate with your personal goals
-4. **Regular Review**: Periodically review and adjust your selected apps
+- **Adjust Duration**: Find a delay time that works for you - not too short, not too long
+- **Personalize Messages**: Create messages that resonate with your personal goals
+- **Regular Review**: Periodically review and adjust your selected apps
 
 ## Troubleshooting
 

@@ -95,7 +95,7 @@ class AppMonitorService : Service() {
         val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Mindful Time Active")
+            .setContentTitle("Extra Mind Time Active")
             .setContentText("Monitoring your selected apps")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(pendingIntent)

@@ -12,18 +12,19 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler {
-                call,
-                result ->
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call,
+                                                                                                  result ->
             when (call.method) {
                 "startMonitoring" -> {
                     startMonitoringService()
                     result.success(true)
                 }
+
                 "stopMonitoring" -> {
                     stopMonitoringService()
                     result.success(true)
                 }
+
                 else -> {
                     result.notImplemented()
                 }
@@ -33,9 +34,9 @@ class MainActivity : FlutterActivity() {
 
     private fun startMonitoringService() {
         val intent =
-                Intent(this, AppMonitorService::class.java).apply {
-                    action = AppMonitorService.ACTION_START_MONITORING
-                }
+            Intent(this, AppMonitorService::class.java).apply {
+                action = AppMonitorService.ACTION_START_MONITORING
+            }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
@@ -46,9 +47,9 @@ class MainActivity : FlutterActivity() {
 
     private fun stopMonitoringService() {
         val intent =
-                Intent(this, AppMonitorService::class.java).apply {
-                    action = AppMonitorService.ACTION_STOP_MONITORING
-                }
+            Intent(this, AppMonitorService::class.java).apply {
+                action = AppMonitorService.ACTION_STOP_MONITORING
+            }
         startService(intent)
     }
 }
