@@ -187,7 +187,6 @@ class AppMonitorService : Service() {
             )
 
             // Get custom recheck interval from settings (default 30 minutes)
-            val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             val recheckIntervalMinutes = prefs.getLong("flutter.recheck_interval_minutes", 30)
             val recheckIntervalMillis = recheckIntervalMinutes * 60 * 1000
             val inactiveApps = activeAppSessions.filter {
@@ -305,7 +304,11 @@ class AppMonitorService : Service() {
 
     private fun registerDelayScreenReceiver() {
         val filter = IntentFilter("com.example.extra_mind_time.DELAY_SCREEN_FINISHED")
-        registerReceiver(delayScreenReceiver, filter)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(delayScreenReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(delayScreenReceiver, filter)
+        }
         Log.d(TAG, "Delay screen receiver registered")
     }
 

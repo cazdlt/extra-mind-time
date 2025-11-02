@@ -6,7 +6,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'screens/permissions_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/delay_screen.dart';
 
 // Global navigator key to show delay screen from anywhere
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
