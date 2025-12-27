@@ -59,6 +59,31 @@ Or use the provided script:
 ./run_app.sh
 ```
 
+### Installing on Physical Device (Motorola/Android)
+
+1. **Enable Developer Options** on your phone:
+   - Go to Settings → About Phone
+   - Tap "Build Number" 7 times until it says "You are now a developer"
+
+2. **Enable USB Debugging**:
+   - Go to Settings → System → Developer Options
+   - Enable "USB Debugging"
+
+3. **Connect your phone** via USB cable
+
+4. **Install the release build**:
+```bash
+./scripts/install_on_phone.sh
+```
+
+Or manually:
+```bash
+flutter build apk --release
+flutter install
+```
+
+**Note**: The app will appear as "Extra Mind Time" in your app drawer. All permissions will be requested when you first launch the app.
+
 ## Configuration
 
 ### Delay Duration
