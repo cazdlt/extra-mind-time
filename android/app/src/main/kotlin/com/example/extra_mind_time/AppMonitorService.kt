@@ -279,6 +279,9 @@ class AppMonitorService : Service() {
                         Log.e(TAG, "User stayed mindful, not starting session for: $app")
                     }
                 }
+
+                // Reset lastCheckedApp so other apps can trigger popups
+                lastCheckedApp = null
             }
         }
     }
