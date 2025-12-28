@@ -47,6 +47,9 @@ dependencies:
   # Device apps list
   installed_apps: ^2.0.0
 
+  # Path provider for file storage
+  path_provider: ^2.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

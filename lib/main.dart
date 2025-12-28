@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:usage_stats/usage_stats.dart';
-import 'dart:async';
-import 'dart:convert';
 import 'screens/permissions_screen.dart';
 import 'screens/home_screen.dart';
 

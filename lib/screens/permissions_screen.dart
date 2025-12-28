@@ -71,7 +71,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
   }
 
   Future<void> _requestNotificationPermission() async {
-    final status = await Permission.notification.request();
+    await Permission.notification.request();
     await _checkAllPermissions();
   }
 

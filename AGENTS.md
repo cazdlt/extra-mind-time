@@ -56,6 +56,11 @@ prefs.getLong("flutter.delay_seconds", 5L)
 - **Dart**: camelCase variables, PascalCase classes, StatefulWidget with setState(), Material 3, no comments
 - **Kotlin**: Handler/Looper (not coroutines), `Log.d(TAG, "message")`, no comments
 
+## Git Operations
+- **NEVER commit automatically** unless explicitly asked by the user
+- Let the user handle all git operations (add, commit, push, etc.) unless specifically instructed
+- If you make changes, just complete the task and let the user decide when/what to commit
+
 ## Key Constants
 - Check interval: 2000ms
 - Default recheck: 30 minutes

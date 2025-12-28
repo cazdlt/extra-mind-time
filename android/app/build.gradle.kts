@@ -5,6 +5,10 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+dependencies {
+    implementation("com.google.code.gson:gson:2.10.1")
+}
+
 android {
     namespace = "com.example.extra_mind_time"
     compileSdk = 34

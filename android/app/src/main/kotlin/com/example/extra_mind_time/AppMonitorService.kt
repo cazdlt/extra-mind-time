@@ -35,7 +35,6 @@ class AppMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Service created")
         createNotificationChannel()
         handler = Handler(Looper.getMainLooper())
         registerDelayScreenReceiver()
@@ -44,13 +43,11 @@ class AppMonitorService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START_MONITORING -> {
-                Log.d(TAG, "Starting monitoring")
                 startForegroundService()
                 startMonitoring()
             }
 
             ACTION_STOP_MONITORING -> {
-                Log.d(TAG, "Stopping monitoring")
                 stopMonitoring()
                 stopSelf()
             }
@@ -105,7 +102,7 @@ class AppMonitorService : Service() {
     }
 
     private fun startMonitoring() {
-        stopMonitoring() // Stop any existing monitoring
+        stopMonitoring()
         lastCheckTime = System.currentTimeMillis()
 
         monitoringRunnable =
@@ -117,7 +114,6 @@ class AppMonitorService : Service() {
             }
 
         handler?.post(monitoringRunnable!!)
-        Log.d(TAG, "Monitoring started")
     }
 
     private fun stopMonitoring() {
@@ -127,7 +123,6 @@ class AppMonitorService : Service() {
         activeAppSessions.clear()
         isDelayScreenActive = false
         unregisterDelayScreenReceiver()
-        Log.d(TAG, "Monitoring stopped")
     }
 
     private fun checkForAppLaunch() {
@@ -176,15 +171,9 @@ class AppMonitorService : Service() {
                 val sessionsToClear = activeAppSessions.keys.toList()
                 activeAppSessions.clear()
                 if (sessionsToClear.isNotEmpty()) {
-                    Log.d(TAG, "User switched to non-monitored app, cleared sessions: $sessionsToClear")
+                    Log.e(TAG, "User switched to non-monitored app, cleared sessions: $sessionsToClear")
                 }
             }
-
-            // Debug logging
-            Log.d(
-                TAG,
-                "Checking app: recentApp=${recentApp?.packageName}, selectedApps=${selectedApps.size}, recentlyShown=${recentlyShownApps.size}, activeSessions=${activeAppSessions.size}, isDelayActive=$isDelayScreenActive"
-            )
 
             // Get custom recheck interval from settings (default 30 minutes)
             val recheckIntervalMinutes = prefs.getLong("flutter.recheck_interval_minutes", 30)
@@ -194,7 +183,7 @@ class AppMonitorService : Service() {
             }.keys
             inactiveApps.forEach { activeAppSessions.remove(it) }
             if (inactiveApps.isNotEmpty()) {
-                Log.d(TAG, "Cleaned up inactive sessions (after ${recheckIntervalMinutes}min): $inactiveApps")
+                Log.e(TAG, "Cleaned up inactive sessions (after ${recheckIntervalMinutes}min): $inactiveApps")
             }
 
             // Check if this is an active session (user already passed the delay screen)
@@ -209,9 +198,6 @@ class AppMonitorService : Service() {
                 !isDelayScreenActive &&
                 !isActiveSession
             ) {
-
-                Log.d(TAG, "Detected monitored app: ${recentApp.packageName} at ${recentApp.lastTimeUsed}")
-
                 // Mark as recently shown and set active flag
                 recentlyShownApps.add(recentApp.packageName)
                 lastCheckedApp = recentApp.packageName
@@ -238,11 +224,9 @@ class AppMonitorService : Service() {
 
     private fun parseJsonArray(json: String): List<String> {
         return try {
-            json.trim()
-                .removeSurrounding("[", "]")
-                .split(",")
-                .map { it.trim().removeSurrounding("\"") }
-                .filter { it.isNotEmpty() }
+            val gson = com.google.gson.Gson()
+            val stringArray = gson.fromJson(json, Array<String>::class.java)
+            stringArray.toList()
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing JSON: ${e.message}")
             emptyList()
@@ -274,20 +258,17 @@ class AppMonitorService : Service() {
         super.onDestroy()
         stopMonitoring()
         unregisterDelayScreenReceiver()
-        Log.d(TAG, "Service destroyed")
     }
 
     private val delayScreenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == "com.example.extra_mind_time.DELAY_SCREEN_FINISHED") {
-                Log.d(TAG, "Delay screen finished notification received")
                 isDelayScreenActive = false
 
                 // When user clicks continue, start tracking their active session
                 val packageName = intent.getStringExtra("packageName")
                 if (packageName != null) {
                     activeAppSessions[packageName] = System.currentTimeMillis()
-                    Log.d(TAG, "Started active session for: $packageName")
                 }
 
                 // Also handle when user chooses to stay mindful
@@ -295,7 +276,7 @@ class AppMonitorService : Service() {
                 if (isStayingMindful) {
                     lastCheckedApp?.let { app ->
                         // Don't start a session if user stayed mindful
-                        Log.d(TAG, "User stayed mindful, not starting session for: $app")
+                        Log.e(TAG, "User stayed mindful, not starting session for: $app")
                     }
                 }
             }
@@ -309,15 +290,13 @@ class AppMonitorService : Service() {
         } else {
             registerReceiver(delayScreenReceiver, filter)
         }
-        Log.d(TAG, "Delay screen receiver registered")
     }
 
     private fun unregisterDelayScreenReceiver() {
         try {
             unregisterReceiver(delayScreenReceiver)
-            Log.d(TAG, "Delay screen receiver unregistered")
         } catch (e: Exception) {
-            Log.w(TAG, "Delay screen receiver already unregistered or not registered: ${e.message}")
+            Log.e(TAG, "Delay screen receiver error: ${e.message}")
         }
     }
 }

@@ -16,13 +16,21 @@ class MainActivity : FlutterActivity() {
                                                                                                   result ->
             when (call.method) {
                 "startMonitoring" -> {
-                    startMonitoringService()
-                    result.success(true)
+                    try {
+                        startMonitoringService()
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("SERVICE_ERROR", e.message, null)
+                    }
                 }
 
                 "stopMonitoring" -> {
-                    stopMonitoringService()
-                    result.success(true)
+                    try {
+                        stopMonitoringService()
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("SERVICE_ERROR", e.message, null)
+                    }
                 }
 
                 else -> {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:installed_apps/app_info.dart';
-import 'dart:convert';
+import '../utils/icon_storage.dart';
 
 class AppSelectionScreen extends StatefulWidget {
   final List<String> selectedApps;
@@ -48,13 +48,7 @@ class _AppSelectionScreenState extends State<AppSelectionScreen> {
         withIcon: true,
       );
 
-      // Debug: Print number of apps and how many have icons
-      print('Loaded ${apps.length} apps');
-      int appsWithIcons = apps.where((app) => app.icon != null).length;
-      print('Apps with icons: $appsWithIcons');
-
-      // Sort apps alphabetically by name
-      apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
+      apps.sort((a, b) => a.name.compareTo(b.name));
 
       setState(() {
         _installedApps = apps;
@@ -86,8 +80,8 @@ class _AppSelectionScreenState extends State<AppSelectionScreen> {
     }
 
     return _installedApps.where((app) {
-      final appNameLower = (app.name ?? '').toLowerCase();
-      final packageNameLower = (app.packageName ?? '').toLowerCase();
+      final appNameLower = app.name.toLowerCase();
+      final packageNameLower = app.packageName.toLowerCase();
       final queryLower = _searchQuery.toLowerCase();
       return appNameLower.contains(queryLower) ||
           packageNameLower.contains(queryLower);
@@ -212,7 +206,7 @@ class _AppSelectionScreenState extends State<AppSelectionScreen> {
                     itemCount: filteredApps.length,
                     itemBuilder: (context, index) {
                       final app = filteredApps[index];
-                      final packageName = app.packageName ?? '';
+                      final packageName = app.packageName;
                       final isSelected = _selectedPackages.contains(
                         packageName,
                       );
@@ -251,7 +245,7 @@ class _AppSelectionScreenState extends State<AppSelectionScreen> {
                         child: ListTile(
                           leading: icon,
                           title: Text(
-                            app.name ?? packageName,
+                            app.name,
                             style: TextStyle(
                               fontWeight: isSelected
                                   ? FontWeight.bold
@@ -290,18 +284,19 @@ class _AppSelectionScreenState extends State<AppSelectionScreen> {
       ),
       floatingActionButton: _selectedPackages.isNotEmpty
           ? FloatingActionButton.extended(
-              onPressed: () {
-                // Update app names and icons for selected apps
+              onPressed: () async {
+                await IconStorage.cleanupUnusedIcons(_selectedPackages.toSet());
+
                 for (final app in _installedApps) {
-                  final packageName = app.packageName ?? '';
-                  if (_selectedPackages.contains(packageName) &&
-                      app.name != null) {
-                    _appNames[packageName] = app.name!;
-                    // Store icon data as base64 string
+                  final packageName = app.packageName;
+                  if (_selectedPackages.contains(packageName)) {
+                    _appNames[packageName] = app.name;
                     if (app.icon != null) {
-                      _appNames['${packageName}_icon'] = base64Encode(
+                      final path = await IconStorage.saveIcon(
+                        packageName,
                         app.icon!,
                       );
+                      _appNames['${packageName}_icon'] = path;
                     }
                   }
                 }

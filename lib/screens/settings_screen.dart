@@ -80,7 +80,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildColorOption(Color color, String name) {
-    final isSelected = _backgroundColor.value == color.value;
+    final isSelected =
+        _backgroundColor.r == color.r &&
+        _backgroundColor.g == color.g &&
+        _backgroundColor.b == color.b &&
+        _backgroundColor.a == color.a;
 
     return GestureDetector(
       onTap: () {
@@ -101,7 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: color.withOpacity(0.3),
+                    color: color.withValues(alpha: 0.3),
                     blurRadius: 8,
                     spreadRadius: 1,
                   ),
@@ -371,8 +375,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                     const SizedBox(height: 12),
-                    ..._defaultMessages.map((message) {
-                      return Padding(
+                    for (final message in _defaultMessages)
+                      Padding(
                         padding: const EdgeInsets.only(bottom: 8.0),
                         child: InkWell(
                           onTap: () => _selectDefaultMessage(message),
@@ -414,8 +418,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ),
                         ),
-                      );
-                    }).toList(),
+                      ),
                   ],
                 ),
               ),
@@ -451,7 +454,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),

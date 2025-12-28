@@ -42,15 +42,8 @@ class DelayActivity : Activity() {
         // Get the target package name from intent
         targetPackageName = intent.getStringExtra("packageName")
 
-
         // Get settings from SharedPreferences
         val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-
-        // Debug: Log all SharedPreferences keys
-        android.util.Log.d("DelayActivity", "All SharedPreferences keys:")
-        prefs.all.forEach { (key, value) ->
-            android.util.Log.d("DelayActivity", "  $key = $value")
-        }
 
         val delaySeconds = prefs.getLong("flutter.delay_seconds", 5L).toInt()
         val mindfulMessage =
@@ -60,48 +53,25 @@ class DelayActivity : Activity() {
             )
                 ?: "Take a moment to breathe and be present."
 
-        // Get background color with test colors for debugging
+        // Get background color
         val backgroundColorValue = prefs.getLong("flutter.background_color", -7637753) // Colors.deepPurple.value
-
-        // Test: Apply some known colors to verify the system works
-        val testColors: Map<Long, String> = mapOf(
-            -7637753L to "Deep Purple",
-            -16738680L to "Blue",
-            -16711936L to "Green",
-            -65536L to "Red",
-            -16777216L to "Black"
-        )
-
-        android.util.Log.d("DelayActivity", "Background color value from SharedPreferences: $backgroundColorValue")
-        android.util.Log.d("DelayActivity", "Background color hex: ${String.format("#%08X", backgroundColorValue)}")
-        android.util.Log.d("DelayActivity", "Color name: ${testColors[backgroundColorValue] ?: "Unknown"}")
 
         // Convert to Android color format
         val backgroundColor = backgroundColorValue.toInt()
 
-        // Check if we're getting the default value
-        val isDefault = backgroundColorValue == -7637753L
-        android.util.Log.d("DelayActivity", "Using default color: $isDefault")
-        android.util.Log.d("DelayActivity", "Final background color: $backgroundColor")
-
         // Create the layout programmatically
-        createLayout(mindfulMessage, backgroundColor, isDefault)
+        createLayout(mindfulMessage, backgroundColor)
 
         // Start the countdown
         startCountdown(delaySeconds)
     }
 
-    private fun createLayout(message: String, backgroundColor: Int, isDefault: Boolean) {
-        android.util.Log.d("DelayActivity", "CREATELayout: Starting layout creation")
-
+    private fun createLayout(message: String, backgroundColor: Int) {
         // Set activity background first
         try {
-            android.util.Log.d("DelayActivity", "CREATELayout: Setting activity background to: $backgroundColor")
-            this.window.decorView.setBackgroundColor(backgroundColor) // Use actual background color
+            this.window.decorView.setBackgroundColor(backgroundColor)
         } catch (e: Exception) {
-            android.util.Log.e("DelayActivity", "CREATELayout: Failed to set activity background: $e")
-            // Fallback to green as a test
-            this.window.decorView.setBackgroundColor(-16711936) // Green
+            this.window.decorView.setBackgroundColor(-16711936) // Green fallback
         }
 
         // Create root layout
@@ -115,23 +85,8 @@ class DelayActivity : Activity() {
                     )
                 setPadding(64, 64, 64, 64)
 
-                // Use the actual background color from SharedPreferences
-                try {
-                    android.util.Log.d(
-                        "DelayActivity",
-                        "CREATELayout: Setting root layout background to: $backgroundColor"
-                    )
-                    setBackgroundColor(backgroundColor) // Use actual background color
-                    background =
-                        android.graphics.drawable.ColorDrawable(backgroundColor) // Use actual background color
-                    android.util.Log.d("DelayActivity", "CREATELayout: Background set to: $backgroundColor")
-                } catch (e: Exception) {
-                    android.util.Log.e("DelayActivity", "CREATELayout: Failed to set root layout background: $e")
-                    // Fallback to green as a test
-                    setBackgroundColor(android.graphics.Color.GREEN)
-                    background = android.graphics.drawable.ColorDrawable(android.graphics.Color.GREEN)
-                }
-
+                setBackgroundColor(backgroundColor)
+                background = android.graphics.drawable.ColorDrawable(backgroundColor)
                 gravity = android.view.Gravity.CENTER
             }
 
@@ -319,15 +274,9 @@ class DelayActivity : Activity() {
 
         // Try setting background after setContentView as well
         try {
-            android.util.Log.d(
-                "DelayActivity",
-                "CREATELayout: Setting background AFTER setContentView to: $backgroundColor"
-            )
-            window.decorView.setBackgroundColor(backgroundColor) // Use actual background color
-            rootLayout.setBackgroundColor(backgroundColor) // Use actual background color
+            window.decorView.setBackgroundColor(backgroundColor)
+            rootLayout.setBackgroundColor(backgroundColor)
         } catch (e: Exception) {
-            android.util.Log.e("DelayActivity", "CREATELayout: Failed to set background after setContentView: $e")
-            // Fallback to green as a test
             window.decorView.setBackgroundColor(android.graphics.Color.GREEN)
             rootLayout.setBackgroundColor(android.graphics.Color.GREEN)
         }

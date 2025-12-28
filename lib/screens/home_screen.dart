@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'app_selection_screen.dart';
 import 'settings_screen.dart';
 import '../services/app_monitor_service.dart';
@@ -48,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
         prefs.getString('mindful_message') ??
         "Take a moment to breathe and be present.";
     final backgroundColorValue =
-        prefs.getInt('background_color') ?? Colors.deepPurple.value;
+        prefs.getInt('background_color') ?? Colors.deepPurple.toARGB32();
     final recheckInterval = prefs.getInt('recheck_interval_minutes') ?? 30;
     final monitoring = prefs.getBool('is_monitoring') ?? false;
 
@@ -74,12 +75,32 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setString('app_names', json.encode(_appNames));
     await prefs.setInt('delay_seconds', _delaySeconds);
     await prefs.setString('mindful_message', _mindfulMessage);
-    await prefs.setInt('background_color', _backgroundColor.value);
+    await prefs.setInt('background_color', _backgroundColor.toARGB32());
     await prefs.setInt('recheck_interval_minutes', _recheckIntervalMinutes);
     await prefs.setBool('is_monitoring', _isMonitoring);
   }
 
   Future<void> _toggleMonitoring() async {
+    if (_selectedApps.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select apps to monitor first')),
+        );
+      }
+      return;
+    }
+
+    if (_delaySeconds < 1 || _delaySeconds > 30) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Delay must be between 1 and 30 seconds'),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _isMonitoring = !_isMonitoring);
     await _saveSettings();
 
@@ -89,7 +110,10 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _isMonitoring = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to start monitoring. Check permissions.'),
+            content: Text(
+              'Failed to start monitoring. Check permissions and try again.',
+            ),
+            backgroundColor: Colors.red,
           ),
         );
       } else if (mounted) {
@@ -410,26 +434,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildAppIcon(String packageName) {
-    // Try to get the base64 encoded icon data
-    final iconData = _appNames['${packageName}_icon'];
+    final iconPath = _appNames['${packageName}_icon'];
 
-    if (iconData != null && iconData.isNotEmpty) {
+    if (iconPath != null && iconPath.isNotEmpty) {
       try {
-        final bytes = base64Decode(iconData);
-        return Image.memory(
-          bytes,
-          width: 40,
-          height: 40,
-          errorBuilder: (context, error, stackTrace) {
-            return const Icon(Icons.android, size: 40, color: Colors.green);
-          },
-        );
-      } catch (e) {
-        // Fallback to default icon if decoding fails
-      }
+        final file = File(iconPath);
+        final exists = file.existsSync();
+        if (exists) {
+          return Image.file(
+            file,
+            width: 40,
+            height: 40,
+            errorBuilder: (context, error, stackTrace) {
+              return const Icon(Icons.android, size: 40, color: Colors.green);
+            },
+          );
+        }
+      } catch (_) {}
     }
 
-    // Fallback to default icon
     return const Icon(Icons.android, size: 40, color: Colors.green);
   }
 }
