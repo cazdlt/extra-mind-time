@@ -408,6 +408,9 @@ class DelayActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         countDownTimer?.cancel()
+        
+        val intent = Intent("com.example.extra_mind_time.CLEAR_STUCK_STATE")
+        sendBroadcast(intent)
     }
 
     override fun onBackPressed() {

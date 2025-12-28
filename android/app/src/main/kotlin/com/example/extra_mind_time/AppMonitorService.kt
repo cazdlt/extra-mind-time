@@ -30,14 +30,15 @@ class AppMonitorService : Service() {
     private var monitoringRunnable: Runnable? = null
     private var lastCheckedApp: String? = null
     private var lastCheckTime: Long = 0
-    private val recentlyShownApps = mutableSetOf<String>()
     private var isDelayScreenActive = false
     private var timeLimitedSession: SessionData? = null
+    private var notificationUpdateRunnable: Runnable? = null
 
     companion object {
         const val ACTION_START_MONITORING = "com.example.extra_mind_time.START_MONITORING"
         const val ACTION_STOP_MONITORING = "com.example.extra_mind_time.STOP_MONITORING"
-        private const val CHECK_INTERVAL = 2000L // Check every 2 seconds
+        private const val CHECK_INTERVAL = 1000L // Check every 1 second
+        private const val NOTIFICATION_UPDATE_INTERVAL = 1000L
 
         @Volatile
         private var instance: AppMonitorService? = null
@@ -50,6 +51,16 @@ class AppMonitorService : Service() {
         instance = this
         createNotificationChannel()
         handler = Handler(Looper.getMainLooper())
+        
+        notificationUpdateRunnable = object : Runnable {
+            override fun run() {
+                if (timeLimitedSession != null) {
+                    updateNotification()
+                }
+                handler?.postDelayed(this, NOTIFICATION_UPDATE_INTERVAL)
+            }
+        }
+        
         registerDelayScreenReceiver()
     }
 
@@ -175,13 +186,14 @@ class AppMonitorService : Service() {
             }
 
         handler?.post(monitoringRunnable!!)
+        handler?.post(notificationUpdateRunnable!!)
     }
 
     private fun stopMonitoring() {
         Log.d(TAG, "=== stopMonitoring called ===")
         monitoringRunnable?.let { handler?.removeCallbacks(it) }
         monitoringRunnable = null
-        recentlyShownApps.clear()
+        notificationUpdateRunnable?.let { handler?.removeCallbacks(it) }
         isDelayScreenActive = false
         timeLimitedSession = null
         updateNotification()
@@ -240,21 +252,6 @@ class AppMonitorService : Service() {
                     showTimeExpiredScreen(session)
                     timeLimitedSession = null
                     updateNotification()
-                    // Mark as recently shown to prevent DelayActivity from appearing
-                    session.packageName?.let { pkg ->
-                        recentlyShownApps.add(pkg)
-                        lastCheckedApp = pkg
-                        // Clear after 60 seconds
-                        handler?.postDelayed(
-                            {
-                                recentlyShownApps.remove(pkg)
-                                if (lastCheckedApp == pkg) {
-                                    lastCheckedApp = null
-                                }
-                            },
-                            60000
-                        )
-                    }
                 }
             }
 
@@ -281,41 +278,22 @@ class AppMonitorService : Service() {
 
             if (recentApp != null &&
                 selectedApps.contains(recentApp.packageName) &&
-                !recentlyShownApps.contains(recentApp.packageName) &&
                 recentApp.packageName != lastCheckedApp &&
                 !isDelayScreenActive &&
                 !hasActiveTimeLimit
             ) {
                 Log.d(TAG, "SHOWING POPUP for ${recentApp.packageName}")
-                // Mark as recently shown and set active flag
-                recentlyShownApps.add(recentApp.packageName)
                 lastCheckedApp = recentApp.packageName
                 isDelayScreenActive = true
 
                 // Show delay screen
                 showDelayScreen(recentApp.packageName)
-
-                // Clear recentlyShown after 60 seconds to prevent immediate re-triggers
-                handler?.postDelayed(
-                    {
-                        recentlyShownApps.remove(recentApp.packageName)
-                        if (lastCheckedApp == recentApp.packageName) {
-                            lastCheckedApp = null
-                        }
-                    },
-                    60000
-                )
             } else {
                 if (recentApp != null && selectedApps.contains(recentApp.packageName)) {
-                    Log.d(TAG, "Popup NOT shown for ${recentApp.packageName} - inRecentlyShown: ${recentlyShownApps.contains(recentApp.packageName)}, isLastChecked: ${recentApp.packageName == lastCheckedApp}, delayActive: $isDelayScreenActive, hasTimeLimit: $hasActiveTimeLimit")
+                    Log.d(TAG, "Popup NOT shown for ${recentApp.packageName} - isLastChecked: ${recentApp.packageName == lastCheckedApp}, delayActive: $isDelayScreenActive, hasTimeLimit: $hasActiveTimeLimit")
                 }
             }
 
-            // Update countdown notification if there's an active time-limited session
-            if (timeLimitedSession != null) {
-                Log.d(TAG, "Updating notification for active session: ${timeLimitedSession!!.appName}")
-                updateNotification()
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Error checking for app launch: ${e.message}", e)
         }
@@ -433,47 +411,12 @@ class AppMonitorService : Service() {
         unregisterDelayScreenReceiver()
     }
 
-    private val delayScreenReceiver = object : BroadcastReceiver() {
+    private val clearStuckStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            Log.e(TAG, "=== BROADCAST RECEIVED: ${intent?.action}, all actions: ${intent?.action} ===")
-            Log.e(TAG, "=== Intent extras: packageName=${intent?.getStringExtra("packageName")}, timeLimit=${intent?.getIntExtra("timeLimitMinutes", -1)} ===")
-            if (intent?.action == "com.example.extra_mind_time.DELAY_SCREEN_FINISHED") {
+            if (intent?.action == "com.example.extra_mind_time.CLEAR_STUCK_STATE") {
                 isDelayScreenActive = false
-
-                // When user clicks continue, get session data
-                val packageName = intent.getStringExtra("packageName")
-                val appName = intent.getStringExtra("appName")
-                val timeLimitMinutes = intent.getIntExtra("timeLimitMinutes", 0)
-
-                Log.d(TAG, "Delay screen finished - Package: $packageName, App: $appName, TimeLimit: $timeLimitMinutes")
-
-                // If user selected a time limit, start time-limited session
-                if (packageName != null && timeLimitMinutes > 0 && appName != null) {
-                    timeLimitedSession = SessionData(
-                        startTime = System.currentTimeMillis(),
-                        timeLimitMinutes = timeLimitMinutes,
-                        packageName = packageName,
-                        appName = appName
-                    )
-                    Log.e(TAG, "CREATED time-limited session: appName=$appName, timeLimit=$timeLimitMinutes, package=$packageName")
-                    updateNotification()
-                    Log.e(TAG, "Started time-limited session for $appName: $timeLimitMinutes minutes")
-                } else {
-                    Log.d(TAG, "No time limit selected, not creating session. timeLimitMinutes=$timeLimitMinutes, appName=$appName, packageName=$packageName")
-                }
-
-                // Also handle when user chooses to stay mindful
-                val isStayingMindful = intent.getBooleanExtra("isStayingMindful", false)
-                if (isStayingMindful) {
-                    lastCheckedApp?.let { app ->
-                        // Don't start a session if user stayed mindful
-                        Log.e(TAG, "User stayed mindful, not starting session for: $app")
-                    }
-                }
-
-                // Reset lastCheckedApp so other apps can trigger popups
-                Log.d(TAG, "Resetting lastCheckedApp from $lastCheckedApp to null")
                 lastCheckedApp = null
+                Log.d(TAG, "Stuck state cleared via broadcast")
             }
         }
     }
@@ -513,16 +456,14 @@ class AppMonitorService : Service() {
     }
 
     private fun registerDelayScreenReceiver() {
-        Log.d(TAG, "Registering delayScreenReceiver")
         try {
-            val filter = IntentFilter("com.example.extra_mind_time.DELAY_SCREEN_FINISHED")
-            // Don't use RECEIVER_NOT_EXPORTED for same-app broadcasts
-            registerReceiver(delayScreenReceiver, filter, Context.RECEIVER_EXPORTED)
-            Log.d(TAG, "delayScreenReceiver registered successfully")
+            val clearStuckFilter = IntentFilter("com.example.extra_mind_time.CLEAR_STUCK_STATE")
+            registerReceiver(clearStuckStateReceiver, clearStuckFilter, Context.RECEIVER_EXPORTED)
+            Log.d(TAG, "clearStuckStateReceiver registered successfully")
         } catch (e: Exception) {
-            Log.e(TAG, "Error registering delayScreenReceiver: ${e.message}", e)
+            Log.e(TAG, "Error registering clearStuckStateReceiver: ${e.message}", e)
         }
-
+        
         try {
             val timeExpiredFilter = IntentFilter().apply {
                 addAction("com.example.extra_mind_time.EXTEND_TIME")
@@ -537,11 +478,9 @@ class AppMonitorService : Service() {
 
     private fun unregisterDelayScreenReceiver() {
         try {
-            Log.d(TAG, "Unregistering delayScreenReceiver")
-            unregisterReceiver(delayScreenReceiver)
-            Log.d(TAG, "delayScreenReceiver unregistered")
+            unregisterReceiver(clearStuckStateReceiver)
         } catch (e: Exception) {
-            Log.e(TAG, "Error unregistering delayScreenReceiver: ${e.message}")
+            Log.e(TAG, "Error unregistering clearStuckStateReceiver: ${e.message}")
         }
         try {
             Log.d(TAG, "Unregistering timeExpiredReceiver")
