@@ -1,6 +1,6 @@
 # AGENTS.md - Extra Mind Time Development Guide
 
-Flutter + Kotlin Android app showing delay screens before opening monitored apps. API 22+.
+Flutter + Kotlin Android app for mindful app usage with delay screens and configurable time limits. API 22+.
 
 ## Quick Commands
 ```bash
@@ -65,10 +65,12 @@ prefs.getString("flutter.time_expired_message", null)
 6. User can extend time or stop using app
 7. Only ONE time-limited session active at a time (switching apps resets timer)
 
-### Broadcast Communication
-- `DELAY_SCREEN_FINISHED`: Delay screen finished
-  - Extras: `packageName`, `appName`, `timeLimitMinutes`, `isStayingMindful`
+### Direct Method Calls
+- `DelayActivity` calls `AppMonitorService.getInstance()?.onDelayScreenFinished()` directly (more reliable than broadcasts)
+  - Parameters: `packageName`, `appName`, `timeLimitMinutes`, `isStayingMindful`
   - Action: If `timeLimitMinutes > 0`, creates time-limited session and shows countdown notification
+
+### Broadcast Communication
 - `TIME_LIMIT_EXTENDED`: User extended time from TimeExpiredActivity
   - Extras: `packageName`, `appName`, `extraMinutes`
   - Action: Resets session with new time limit
@@ -87,9 +89,11 @@ prefs.getString("flutter.time_expired_message", null)
 
 ## Key Constants
 - Check interval: 2000ms
-- Delay range: 1-30 seconds
+- Delay range: 1-30 seconds (default: 5)
 - Recently shown cooldown: 60 seconds
-- Time limit options: Default [2, 5, 10] minutes (configurable, max 3 options)
+- Time limit options: Default [2, 5, 10] minutes (configurable, max 3 options from [2,5,10,15,20,30])
+- Countdown format: MM:SS (e.g., "2:30 remaining")
+- Expiration protection: 60 seconds to prevent double popup
 
 ## File Structure
 ```
@@ -108,4 +112,7 @@ android/.../extra_mind_time/
 - **Delay not showing**: Check SYSTEM_ALERT_WINDOW permission, verify monitoring active, check `adb logcat -s AppMonitorService`
 - **Monitoring not starting**: Verify all permissions granted, check PACKAGE_USAGE_STATS in Android Settings, disable battery optimization
 - **Build failures**: `flutter clean && flutter pub get`
+- **Double popup (mindful + expired)**: Time expiration marks app as "recently shown" for 60s to prevent this. If it happens, force-stop and restart monitoring
+- **Countdown not updating**: Check logcat for notification update errors, ensure service is still running
+- **Session ending unexpectedly**: Normal behavior - switching apps ends the current session (intentional design)
 

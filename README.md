@@ -1,22 +1,28 @@
-# Extra Mind Time - Android App Usage Manager
+# Extra Mind Time - Mindful App Usage Manager
 
-A Flutter app for Android that helps you be more intentional with your app usage by showing a delay screen when you open selected apps.
+A Flutter app for Android that helps you be more intentional with your app usage by showing a mindful delay screen when you open selected apps, followed by configurable time limits.
 
 ## Features
 
 - 🔒 **Permission Management**: Easy-to-use interface for requesting necessary Android permissions
 - 📱 **App Selection**: Choose which apps you want to monitor from your installed applications
-- ⏱️ **Customizable Delay**: Set delay duration from 1 to 30 seconds
-- 💭 **Mindful Messages**: Customize or choose from default mindful messages
-🎨 **Beautiful UI**: Modern Material 3 design with smooth animations
-🔄 **Real-time Monitoring**: Background service monitors selected app launches
+- 🧘 **Mindful Delay**: 5-second countdown with customizable message before opening apps
+- ⏱️ **Time Limits**: Select time limits (2, 5, 10, 15, 20, or 30 minutes) for monitored apps
+- 📊 **Real-time Countdown**: Persistent notification shows remaining time in minutes:seconds format
+- ➕ **Easy Extensions**: Add +1 minute to your time limit directly from the notification
+- 🎨 **Customizable UI**: Set background colors and personalized messages
+- 🔄 **Smart Session Management**: Automatically ends sessions when switching apps
+- 🎯 **Kind Reminders**: Gentle popup when time expires with extension options
 
 ## How It Works
 
-1. **Select Apps**: Choose which apps you want to add an intentional pause to
-2. **Configure Settings**: Set your delay duration and choose a message
+1. **Select Apps**: Choose which apps you want to add mindful limits to
+2. **Configure Settings**: Set your delay duration, time limit options, and custom messages
 3. **Start Monitoring**: Enable the monitoring service
-4. **Intentional Pause**: When you open a selected app, you'll see a beautiful delay screen with your chosen message and a countdown timer
+4. **Mindful Pause**: When you open a selected app, you'll see a 5-second delay screen with your chosen message
+5. **Choose Time Limit**: After the pause, select how long you want to use the app
+6. **Track Time**: A notification shows your remaining time in minutes:seconds format
+7. **Extend or End**: Add more time or switch apps to end your session
 
 ## Permissions Required
 
@@ -88,27 +94,29 @@ flutter install
 
 ### Delay Duration
 - Adjustable from 1 to 30 seconds
-- Set via the Settings screen
-- Uses a smooth slider interface
+- Default: 5 seconds for mindful pause
+- Set via the Settings screen with a smooth slider interface
+
+### Time Limit Options
+- Choose up to 3 time limit options from: 2, 5, 10, 15, 20, 30 minutes
+- Default options: 2, 5, 10 minutes
+- Users select their desired limit after the mindful pause
 
 ### Messages
+- **Mindful Message**: Displayed during the delay screen (max 200 characters)
+- **Time Expired Message**: Shown when time runs out (max 200 characters)
+  - Default: "Your mindful time is complete. How much more time would you like?"
+- Create custom messages that resonate with your goals
 
-Choose from default messages or create your own:
-- "Take a moment to breathe and be present."
-- "Is this truly necessary right now?"
-- "Remember your intentions for today."
-- "What matters most to you in this moment?"
-- "Take a deep breath before continuing."
-- "Are you choosing this intentionally?"
-- "Stay present. Stay focused."
-- "This moment is all you have."
+### Background Colors
+- Choose from 10 preset colors for the mindful delay screen
+- Options: Deep Purple, Indigo, Blue, Teal, Green, Orange, Red, Pink, Dark Grey, Black
 
 ## Technical Details
 
 ### Dependencies
 
 - `permission_handler` - Handle Android permissions
-- `usage_stats` - Monitor app usage statistics
 - `shared_preferences` - Store app settings locally
 - `device_apps` - List installed applications
 
@@ -118,23 +126,59 @@ Choose from default messages or create your own:
 lib/
 ├── main.dart                 # App entry point and initialization
 ├── screens/
-│   ├── permissions_screen.dart   # Permission request UI
-│   ├── home_screen.dart          # Main dashboard
-│   ├── app_selection_screen.dart # App selection interface
-│   ├── settings_screen.dart      # Settings configuration
-│   └── delay_screen.dart         # Intentional delay screen
+│   ├── permissions_screen.dart    # Permission request UI
+│   ├── home_screen.dart           # Main dashboard
+│   ├── app_selection_screen.dart  # App selection interface
+│   └── settings_screen.dart       # Settings configuration
 ├── services/
-│   └── app_monitor_service.dart  # Background monitoring service
-└── models/
-    └── (future model classes)
+│   └── app_monitor_service.dart   # Flutter service interface
+
+android/app/src/main/kotlin/com/example/extra_mind_time/
+├── AppMonitorService.kt        # Background monitoring service
+├── DelayActivity.kt            # Mindful delay screen (native)
+└── TimeExpiredActivity.kt      # Time limit expired popup (native)
 ```
 
 ### Key Components
 
-1. **AppMonitorService**: Periodically checks for app launches and triggers the delay screen
-2. **DelayScreen**: Full-screen overlay with countdown timer and intentional message
-3. **PermissionsScreen**: Guides users through permission setup
-4. **HomeScreen**: Central dashboard for monitoring control and configuration
+1. **AppMonitorService** (Kotlin): Foreground service that:
+   - Monitors app launches every 2 seconds
+   - Shows DelayActivity when monitored apps are opened
+   - Manages time-limited sessions with countdown
+   - Updates notification with remaining time (MM:SS format)
+   - Handles +1 minute extension from notification
+   - Ends sessions when switching to other apps
+
+2. **DelayActivity** (Kotlin): Full-screen overlay that:
+   - Displays customizable mindful message
+   - Shows 5-second countdown timer
+   - Presents time limit options after countdown
+   - Calls service directly when user selects time limit
+
+3. **TimeExpiredActivity** (Kotlin): Popup shown when time expires:
+   - Displays custom expiration message
+   - Offers extension options (2, 5, 10, 15, 20, 30 minutes)
+   - Allows returning to home screen
+
+4. **HomeScreen** (Flutter): Central dashboard for:
+   - Selecting apps to monitor
+   - Starting/stopping monitoring
+   - Accessing settings
+
+5. **SettingsScreen** (Flutter): Configuration for:
+   - Delay duration (1-30 seconds)
+   - Time limit options (select up to 3)
+   - Mindful message customization
+   - Time expired message customization
+   - Background color selection
+
+### Session Management
+
+- **Single Session**: Only one time-limited session active at a time
+- **Auto-End**: Session ends when user switches to a different app
+- **Countdown Format**: Notification shows `MM:SS` (e.g., "2:30 remaining")
+- **Extension**: +1 minute button available in notification
+- **Expiration Prevention**: After time expires, app is marked to prevent DelayActivity from reappearing
 
 ## Android Manifest Configuration
 
@@ -151,10 +195,12 @@ The app requires the following manifest entries:
 
 ## Usage Tips
 
-1. **Start Small**: Begin with 1-2 apps that you want to be more mindful about
-- **Adjust Duration**: Find a delay time that works for you - not too short, not too long
-- **Personalize Messages**: Create messages that resonate with your personal goals
-- **Regular Review**: Periodically review and adjust your selected apps
+1. **Start Small**: Begin with 1-2 apps you want to be more mindful about (social media, games, etc.)
+2. **Choose Limits Wisely**: Start with longer time limits (15-30 min) and gradually reduce
+3. **Personalize Messages**: Create messages that resonate with your personal goals
+4. **Use Extensions Sparingly**: The +1 minute button is there for when you genuinely need it
+5. **Review Regularly**: Periodically review your selected apps and time limits
+6. **Be Kind to Yourself**: The app is about mindfulness, not restriction
 
 ## Troubleshooting
 
@@ -173,15 +219,46 @@ The app requires the following manifest entries:
 - Make sure the app is selected for monitoring
 - Check that monitoring service is running
 
+### Countdown Notification Not Updating
+- Swipe away and re-enable monitoring to restart the service
+- Check that the app is still in the foreground
+- Ensure you haven't switched to a different monitored app
+
+### Time Expired Popup Not Appearing
+- Verify you haven't switched apps (session ends on app switch)
+- Check that notification permissions are enabled
+- Make sure the app hasn't been killed by the system
+
+### Both Popups Appearing
+- After time expires, the app prevents the DelayActivity for 60 seconds
+- If you see both, force stop the app and restart monitoring
+
+### Session Ending Unexpectedly
+- Sessions automatically end when you switch to another app
+- This is intentional - one time-limited session at a time
+- Re-open the app to start a new session
+
 ## Future Enhancements
 
-- [ ] Statistics and usage insights
-- [ ] Daily/weekly usage reports
-- [ ] Custom delay times per app
-- [ ] Multiple message rotation
-- [ ] Widget support
-- [ ] Export/import settings
-- [ ] Dark mode theme
+### Free Tier (Current)
+- 2 monitored apps maximum
+- Mindful delay with countdown
+- Time limit options (2, 5, 10 minutes)
+- Custom messages and colors
+- Real-time countdown notifications
+
+### Premium Tier ($1.99 one-time purchase)
+- Unlimited monitored apps
+- Usage reports and analytics (time spent per app, sessions per day, trends)
+- Widget support for quick monitoring toggle
+- Premium-only time limit options (custom any duration)
+- Export/import settings
+
+### Implementation Roadmap
+- [ ] Integrate Google Play Billing Library
+- [ ] Create premium upgrade missing features
+- [ ] Implement usage analytics data collection
+- [ ] Create home screen widget for monitoring toggle
 
 ## Contributing
 
