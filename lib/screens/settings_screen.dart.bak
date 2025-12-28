@@ -4,6 +4,7 @@ class SettingsScreen extends StatefulWidget {
   final int delaySeconds;
   final String mindfulMessage;
   final Color backgroundColor;
+  final int recheckIntervalMinutes;
   final List<int> timeLimitOptions;
   final String timeExpiredMessage;
 
@@ -12,9 +13,10 @@ class SettingsScreen extends StatefulWidget {
     this.delaySeconds = 5,
     this.mindfulMessage = "Take a moment to breathe and be present.",
     this.backgroundColor = Colors.blue,
+    this.recheckIntervalMinutes = 30,
     this.timeLimitOptions = const [2, 5, 10],
     this.timeExpiredMessage =
-        "Your mindful time is complete. How much more time would you like?",
+        "Your time is up! How much more time do you need?",
   });
 
   @override
@@ -25,8 +27,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late int _delaySeconds;
   late TextEditingController _messageController;
   late Color _backgroundColor;
+  late int _recheckIntervalMinutes;
   late List<int> _timeLimitOptions;
   late TextEditingController _timeExpiredMessageController;
+
+  final List<String> _defaultMessages = [
+    "Take a moment to breathe and be present.",
+    "Is this truly necessary right now?",
+    "Remember your intentions for today.",
+    "What matters most to you in this moment?",
+    "Take a deep breath before continuing.",
+    "Are you choosing this mindfully?",
+    "Stay present. Stay focused.",
+    "This moment is all you have.",
+  ];
 
   @override
   void initState() {
@@ -34,6 +48,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _delaySeconds = widget.delaySeconds;
     _messageController = TextEditingController(text: widget.mindfulMessage);
     _backgroundColor = widget.backgroundColor;
+    _recheckIntervalMinutes = widget.recheckIntervalMinutes > 30
+        ? 30
+        : widget.recheckIntervalMinutes;
     _timeLimitOptions = widget.timeLimitOptions;
     _timeExpiredMessageController = TextEditingController(
       text: widget.timeExpiredMessage,
@@ -72,8 +89,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'delaySeconds': _delaySeconds,
       'mindfulMessage': _messageController.text.trim(),
       'backgroundColor': _backgroundColor,
+      'recheckIntervalMinutes': _recheckIntervalMinutes > 30
+          ? 30
+          : _recheckIntervalMinutes,
       'timeLimitOptions': _timeLimitOptions,
       'timeExpiredMessage': _timeExpiredMessageController.text.trim(),
+    });
+  }
+
+  void _selectDefaultMessage(String message) {
+    setState(() {
+      _messageController.text = message;
     });
   }
 
@@ -209,8 +235,94 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ],
                     ),
-                  ],
-                ),
+                      ],
+                    ),
+                  ),
+            ),
+            const SizedBox(height: 16),
+
+            // Time Limit Options Card
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.update, color: Colors.orange),
+                        SizedBox(width: 12),
+                        Text(
+                          'Re-check Interval',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'How long before showing the mindful screen again for the same app?',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '$_recheckIntervalMinutes',
+                          style: const TextStyle(
+                            fontSize: 48,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.deepOrange,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'minutes',
+                          style: TextStyle(fontSize: 18, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      value: _recheckIntervalMinutes
+                          .clamp(1.0, 30.0)
+                          .toDouble(),
+                      min: 1,
+                      max: 30,
+                      divisions: 29,
+                      label: '$_recheckIntervalMinutes minutes',
+                      activeColor: Colors.deepOrange,
+                      onChanged: (value) {
+                        setState(() {
+                          _recheckIntervalMinutes = value.toInt();
+                        });
+                      },
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '1m',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          '30m',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                      ],
+                    ),
+                  ),
               ),
             ),
             const SizedBox(height: 16),
@@ -360,7 +472,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Example: "Your mindful time is complete. How much more time would you like?"',
+                      'Example: "Your time is up! How much more time do you need?"',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -413,6 +525,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         fillColor: Colors.grey[50],
                       ),
                     ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Default Messages Card
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.lightbulb_outline, color: Colors.orange),
+                        SizedBox(width: 12),
+                        Text(
+                          'Default Messages',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Tap any message to use it',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 12),
+                    for (final message in _defaultMessages)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: InkWell(
+                          onTap: () => _selectDefaultMessage(message),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _messageController.text == message
+                                  ? Colors.deepPurple[50]
+                                  : Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _messageController.text == message
+                                    ? Colors.deepPurple
+                                    : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.format_quote,
+                                  size: 16,
+                                  color: Colors.grey[600],
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    message,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: _messageController.text == message
+                                          ? Colors.deepPurple[700]
+                                          : Colors.black87,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

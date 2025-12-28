@@ -19,7 +19,9 @@ class _HomeScreenState extends State<HomeScreen> {
   int _delaySeconds = 5;
   String _mindfulMessage = "Take a moment to breathe and be present.";
   Color _backgroundColor = Colors.deepPurple;
-  int _recheckIntervalMinutes = 30;
+  List<int> _timeLimitOptions = [2, 5, 10];
+  String _timeExpiredMessage =
+      "Your mindful time is complete. How much more time would you like?";
   bool _isMonitoring = false;
   bool _isLoading = true;
 
@@ -51,6 +53,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final backgroundColorValue =
         prefs.getInt('background_color') ?? Colors.deepPurple.toARGB32();
     final recheckInterval = prefs.getInt('recheck_interval_minutes') ?? 30;
+    final timeLimitOptionsJson = prefs.getString('time_limit_options');
+    final timeLimitOptions = timeLimitOptionsJson != null
+        ? List<int>.from(json.decode(timeLimitOptionsJson))
+        : [2, 5, 10];
+    final timeExpiredMessage =
+        prefs.getString('time_expired_message') ??
+        "Your mindful time is complete. How much more time would you like?";
     final monitoring = prefs.getBool('is_monitoring') ?? false;
 
     setState(() {
@@ -59,7 +68,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _delaySeconds = delay;
       _mindfulMessage = message;
       _backgroundColor = Color(backgroundColorValue);
-      _recheckIntervalMinutes = recheckInterval;
+      _timeLimitOptions = timeLimitOptions;
+      _timeExpiredMessage = timeExpiredMessage;
       _isMonitoring = monitoring;
       _isLoading = false;
     });
@@ -76,7 +86,8 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setInt('delay_seconds', _delaySeconds);
     await prefs.setString('mindful_message', _mindfulMessage);
     await prefs.setInt('background_color', _backgroundColor.toARGB32());
-    await prefs.setInt('recheck_interval_minutes', _recheckIntervalMinutes);
+    await prefs.setString('time_limit_options', json.encode(_timeLimitOptions));
+    await prefs.setString('time_expired_message', _timeExpiredMessage);
     await prefs.setBool('is_monitoring', _isMonitoring);
   }
 
@@ -165,7 +176,8 @@ class _HomeScreenState extends State<HomeScreen> {
           delaySeconds: _delaySeconds,
           mindfulMessage: _mindfulMessage,
           backgroundColor: _backgroundColor,
-          recheckIntervalMinutes: _recheckIntervalMinutes,
+          timeLimitOptions: _timeLimitOptions,
+          timeExpiredMessage: _timeExpiredMessage,
         ),
       ),
     );
@@ -175,7 +187,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _delaySeconds = result['delaySeconds'] as int;
         _mindfulMessage = result['mindfulMessage'] as String;
         _backgroundColor = result['backgroundColor'] as Color;
-        _recheckIntervalMinutes = result['recheckIntervalMinutes'] as int;
+        _timeLimitOptions = List<int>.from(result['timeLimitOptions'] as List);
+        _timeExpiredMessage = result['timeExpiredMessage'] as String;
       });
       await _saveSettings();
     }

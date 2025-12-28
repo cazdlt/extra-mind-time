@@ -68,11 +68,8 @@ echo "✅ Using device: $DEVICE_ID"
 # Install APK using adb
 APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
 
-echo "🔄 Uninstalling existing version (if any)..."
-adb -s "$DEVICE_ID" uninstall com.example.extra_mind_time 2>/dev/null || true
-
-echo "📦 Installing new version..."
-adb -s "$DEVICE_ID" install "$APK_PATH"
+echo "📦 Installing (preserving data)..."
+adb -s "$DEVICE_ID" install -r "$APK_PATH"
 
 echo ""
 echo "✅ Installation complete!"

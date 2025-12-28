@@ -25,8 +25,10 @@ class DelayActivity : Activity() {
     private lateinit var progressBar: ProgressBar
     private lateinit var iconView: TextView
     private lateinit var closeButton: Button
-    private lateinit var openButton: Button
+    private lateinit var timeLimitButtonsLayout: LinearLayout
     private var targetPackageName: String? = null
+    private var targetAppName: String? = null
+    private var timeLimitOptions: List<Int> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,8 +41,9 @@ class DelayActivity : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
         window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
 
-        // Get the target package name from intent
+        // Get the target package name and app name from intent
         targetPackageName = intent.getStringExtra("packageName")
+        targetAppName = intent.getStringExtra("appName")
 
         // Get settings from SharedPreferences
         val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
@@ -52,6 +55,19 @@ class DelayActivity : Activity() {
                 "Take a moment to breathe and be present."
             )
                 ?: "Take a moment to breathe and be present."
+
+        // Get time limit options
+        val timeLimitOptionsJson = prefs.getString("flutter.time_limit_options", null)
+        timeLimitOptions = if (timeLimitOptionsJson != null) {
+            try {
+                val gson = com.google.gson.Gson()
+                gson.fromJson(timeLimitOptionsJson, Array<Int>::class.java).toList()
+            } catch (e: Exception) {
+                listOf(2, 5, 10)
+            }
+        } else {
+            listOf(2, 5, 10)
+        }
 
         // Get background color
         val backgroundColorValue = prefs.getLong("flutter.background_color", -7637753) // Colors.deepPurple.value
@@ -214,7 +230,7 @@ class DelayActivity : Activity() {
         // Buttons container
         val buttonsLayout =
             LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
+                orientation = LinearLayout.VERTICAL
                 layoutParams =
                     LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
@@ -228,17 +244,19 @@ class DelayActivity : Activity() {
                 gravity = Gravity.CENTER
             }
 
-        // Close button - goes to home screen
+        // Stay Mindful button
         closeButton =
             Button(this).apply {
                 text = "🙏 Stay Mindful"
                 textSize = 16f
                 setTextColor(0xFFFFFFFF.toInt())
                 layoutParams =
-                    LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                        .apply { rightMargin = 16 }
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = 12 }
                 setBackgroundColor(0x88000000.toInt())
-                setPadding(24, 32, 24, 32)
+                setPadding(24, 24, 24, 24)
                 setOnClickListener {
                     countDownTimer?.cancel()
                     goToHomeScreen()
@@ -246,27 +264,56 @@ class DelayActivity : Activity() {
             }
         buttonsLayout.addView(closeButton)
 
-        // Open button - closes overlay and allows app to open
-        openButton =
-            Button(this).apply {
-                text = "✨ Continue"
-                textSize = 16f
-                setTextColor(0xFFFFFFFF.toInt())
+        // Time limit buttons container
+        timeLimitButtonsLayout =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
                 layoutParams =
-                    LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                        .apply { leftMargin = 16 }
-                setBackgroundColor(0xAAFFFFFF.toInt())
-                setTextColor(0xFF4A148C.toInt())
-                setPadding(24, 32, 24, 32)
-                isEnabled = false
-                alpha = 0.5f
-                setOnClickListener {
-                    countDownTimer?.cancel()
-                    notifyDelayScreenFinished(isContinue = true)
-                    finish()
-                }
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                gravity = Gravity.CENTER
+                visibility = android.view.View.GONE
             }
-        buttonsLayout.addView(openButton)
+
+        val timeLimitLabel = TextView(this).apply {
+            text = "How much time do you need?"
+            textSize = 16f
+            setTextColor(0xCCFFFFFF.toInt())
+            gravity = android.view.Gravity.CENTER
+            layoutParams =
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = 12 }
+        }
+        timeLimitButtonsLayout.addView(timeLimitLabel)
+
+        // Create time limit option buttons
+        for (minutes in timeLimitOptions) {
+            val timeLimitButton =
+                Button(this).apply {
+                    text = "$minutes ${if (minutes == 1) "minute" else "minutes"}"
+                    textSize = 16f
+                    setTextColor(0xFF4A148C.toInt())
+                    layoutParams =
+                        LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { bottomMargin = 8 }
+                    setBackgroundColor(0xAAFFFFFF.toInt())
+                    setPadding(24, 20, 24, 20)
+                    isEnabled = false
+                    alpha = 0.5f
+                    setOnClickListener {
+                        selectTimeLimit(minutes)
+                    }
+                }
+            timeLimitButtonsLayout.addView(timeLimitButton)
+        }
+
+        buttonsLayout.addView(timeLimitButtonsLayout)
 
         rootLayout.addView(buttonsLayout)
 
@@ -326,12 +373,25 @@ class DelayActivity : Activity() {
                     secondsLabelTextView.text = "seconds"
                     progressBar.progress = 0
 
-                    // Enable the open button when timer finishes
-                    openButton.isEnabled = true
-                    openButton.alpha = 1.0f
+                    // Enable time limit buttons
+                    timeLimitButtonsLayout.visibility = android.view.View.VISIBLE
+                    for (i in 0 until timeLimitButtonsLayout.childCount) {
+                        val child = timeLimitButtonsLayout.getChildAt(i)
+                        if (child is Button) {
+                            child.isEnabled = true
+                            child.alpha = 1.0f
+                        }
+                    }
                 }
             }
                 .start()
+    }
+
+    private fun selectTimeLimit(minutes: Int) {
+        android.util.Log.d("DelayActivity", "selectTimeLimit called: minutes=$minutes")
+        countDownTimer?.cancel()
+        notifyDelayScreenFinished(isContinue = true, timeLimitMinutes = minutes)
+        finish()
     }
 
     private fun goToHomeScreen() {
@@ -355,11 +415,20 @@ class DelayActivity : Activity() {
         // User must wait for the timer to finish
     }
 
-    private fun notifyDelayScreenFinished(isContinue: Boolean = false) {
-        // Send broadcast to notify service that delay screen is finished
-        val intent = Intent("com.example.extra_mind_time.DELAY_SCREEN_FINISHED")
-        intent.putExtra("packageName", targetPackageName)
-        intent.putExtra("isStayingMindful", !isContinue) // true when user clicked "Stay Mindful"
-        sendBroadcast(intent)
+    private fun notifyDelayScreenFinished(isContinue: Boolean = false, timeLimitMinutes: Int = 0) {
+        // Call service directly instead of broadcast
+        val service = AppMonitorService.getInstance()
+        android.util.Log.d("DelayActivity", "Getting service instance: $service")
+        if (service != null) {
+            android.util.Log.d("DelayActivity", "Calling service.onDelayScreenFinished directly")
+            service.onDelayScreenFinished(
+                packageName = targetPackageName,
+                appName = targetAppName,
+                timeLimitMinutes = timeLimitMinutes,
+                isStayingMindful = !isContinue
+            )
+        } else {
+            android.util.Log.e("DelayActivity", "Service instance is null, cannot notify service")
+        }
     }
 }
