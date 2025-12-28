@@ -2,6 +2,7 @@ package com.example.extra_mind_time
 
 import android.app.*
 import android.app.usage.UsageStatsManager
+import android.app.usage.UsageEvents
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -26,18 +27,21 @@ class AppMonitorService : Service() {
     private val TAG = "AppMonitorService"
     private val NOTIFICATION_ID = 1001
     private val CHANNEL_ID = "AppMonitorChannel"
+    private val TIME_EXPIRATION_REQUEST_CODE = 1002
     private var handler: Handler? = null
     private var monitoringRunnable: Runnable? = null
     private var lastCheckedApp: String? = null
-    private var lastCheckTime: Long = 0
+    private var lastProcessedEventTime: Long = 0
     private var isDelayScreenActive = false
-    private var timeLimitedSession: SessionData? = null
+    var timeLimitedSession: SessionData? = null
     private var notificationUpdateRunnable: Runnable? = null
+    private var alarmManager: AlarmManager? = null
+    private var timeExpirationPendingIntent: PendingIntent? = null
 
     companion object {
         const val ACTION_START_MONITORING = "com.example.extra_mind_time.START_MONITORING"
         const val ACTION_STOP_MONITORING = "com.example.extra_mind_time.STOP_MONITORING"
-        private const val CHECK_INTERVAL = 1000L // Check every 1 second
+        private const val CHECK_INTERVAL = 2000L // Check for new events every 2 seconds
         private const val NOTIFICATION_UPDATE_INTERVAL = 1000L
 
         @Volatile
@@ -51,7 +55,8 @@ class AppMonitorService : Service() {
         instance = this
         createNotificationChannel()
         handler = Handler(Looper.getMainLooper())
-        
+        alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+
         notificationUpdateRunnable = object : Runnable {
             override fun run() {
                 if (timeLimitedSession != null) {
@@ -60,7 +65,7 @@ class AppMonitorService : Service() {
                 handler?.postDelayed(this, NOTIFICATION_UPDATE_INTERVAL)
             }
         }
-        
+
         registerDelayScreenReceiver()
     }
 
@@ -165,7 +170,7 @@ class AppMonitorService : Service() {
         return builder.build()
     }
 
-    private fun updateNotification() {
+    fun updateNotification() {
         Log.d(TAG, "updateNotification called")
         val notification = createNotification()
         val notificationManager = getSystemService(NotificationManager::class.java)
@@ -175,7 +180,6 @@ class AppMonitorService : Service() {
 
     private fun startMonitoring() {
         stopMonitoring()
-        lastCheckTime = System.currentTimeMillis()
 
         monitoringRunnable =
             object : Runnable {
@@ -194,15 +198,54 @@ class AppMonitorService : Service() {
         monitoringRunnable?.let { handler?.removeCallbacks(it) }
         monitoringRunnable = null
         notificationUpdateRunnable?.let { handler?.removeCallbacks(it) }
+        cancelTimeExpirationAlarm()
         isDelayScreenActive = false
         timeLimitedSession = null
         updateNotification()
         unregisterDelayScreenReceiver()
     }
 
+    private fun setTimeExpirationAlarm(timeLimitMinutes: Int) {
+        cancelTimeExpirationAlarm()
+
+        val expirationTime = System.currentTimeMillis() + (timeLimitMinutes * 60 * 1000L)
+
+        val intent = Intent("com.example.extra_mind_time.TIME_EXPIRED")
+        timeExpirationPendingIntent = PendingIntent.getBroadcast(
+            this,
+            TIME_EXPIRATION_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        alarmManager?.let {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                it.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    expirationTime,
+                    timeExpirationPendingIntent!!
+                )
+            } else {
+                it.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    expirationTime,
+                    timeExpirationPendingIntent!!
+                )
+            }
+            Log.d(TAG, "Time expiration alarm set for $timeLimitMinutes minutes from now")
+        }
+    }
+
+    fun cancelTimeExpirationAlarm() {
+        timeExpirationPendingIntent?.let {
+            alarmManager?.cancel(it)
+            Log.d(TAG, "Time expiration alarm cancelled")
+        }
+        timeExpirationPendingIntent = null
+    }
+
     private fun checkForAppLaunch() {
         try {
-            // Get selected apps from SharedPreferences
             val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             val selectedAppsJson = prefs.getString("flutter.selected_apps", null)
 
@@ -210,87 +253,82 @@ class AppMonitorService : Service() {
                 return
             }
 
-            // Parse selected apps (simple JSON array parsing)
             val selectedApps = parseJsonArray(selectedAppsJson)
 
             if (selectedApps.isEmpty()) {
                 return
             }
 
-            // Get usage stats
-            val usageStatsManager =
-                getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val currentTime = System.currentTimeMillis()
-            val startTime = currentTime - 5000 // Look back 5 seconds to catch recent app switches
 
-            val usageStatsList =
-                usageStatsManager.queryUsageStats(
-                    UsageStatsManager.INTERVAL_BEST,
-                    startTime,
-                    currentTime
-                )
+            val usageEvents = usageStatsManager.queryEvents(lastProcessedEventTime, currentTime)
 
-            if (usageStatsList.isNullOrEmpty()) {
+            if (usageEvents == null) {
                 return
             }
 
-            // Find the most recently used app that was actually used in the last 3 seconds
-            val threeSecondsAgo = currentTime - 3000
-            val recentApp =
-                usageStatsList
-                    .filter { it.lastTimeUsed > threeSecondsAgo && it.packageName != packageName }
-                    .maxByOrNull { it.lastTimeUsed }
+            var currentForegroundPackage: String? = null
+            val event = UsageEvents.Event()
 
-            Log.d(TAG, "recentApp: ${recentApp?.packageName}, timeLimitedSession: ${timeLimitedSession?.appName}")
+            while (usageEvents.hasNextEvent()) {
+                usageEvents.getNextEvent(event)
 
-            // Check if time-limited session has expired
-            timeLimitedSession?.let { session ->
-                val elapsedMinutes = ((currentTime - session.startTime) / 60000).toInt()
-                Log.d(TAG, "Session check - elapsed: $elapsedMinutes, limit: ${session.timeLimitMinutes}")
-                if (elapsedMinutes >= session.timeLimitMinutes) {
-                    Log.e(TAG, "Time limit expired for ${session.packageName}")
-                    showTimeExpiredScreen(session)
-                    timeLimitedSession = null
-                    updateNotification()
+                val packageName = event.packageName
+                val eventType = event.eventType
+                val eventTime = event.timeStamp
+
+                if (packageName == this.packageName) {
+                    continue
+                }
+
+                if (eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                    Log.d(TAG, "App moved to foreground: $packageName at $eventTime")
+                    currentForegroundPackage = packageName
+
+                    if (selectedApps.contains(packageName)) {
+                        val hasActiveTimeLimit = timeLimitedSession != null &&
+                            timeLimitedSession!!.packageName == packageName
+
+                        if (!isDelayScreenActive && !hasActiveTimeLimit && packageName != lastCheckedApp) {
+                            Log.d(TAG, "SHOWING POPUP for $packageName")
+                            lastCheckedApp = packageName
+                            isDelayScreenActive = true
+                            showDelayScreen(packageName)
+                        } else if (hasActiveTimeLimit) {
+                            Log.d(TAG, "Popup NOT shown - active time limit for $packageName")
+                        } else if (isDelayScreenActive) {
+                            Log.d(TAG, "Popup NOT shown - delay screen active for $packageName")
+                        } else {
+                            Log.d(TAG, "Popup NOT shown - last checked app same: $packageName")
+                        }
+                    }
+                } else if (eventType == UsageEvents.Event.MOVE_TO_BACKGROUND) {
+                    Log.d(TAG, "App moved to background: $packageName at $eventTime")
+
+                    timeLimitedSession?.let { session ->
+                        if (session.packageName == packageName) {
+                            Log.e(TAG, "User switched from ${session.packageName}, ending time-limited session")
+                            cancelTimeExpirationAlarm()
+                            timeLimitedSession = null
+                            updateNotification()
+                        }
+                    }
+                }
+
+                if (eventTime > lastProcessedEventTime) {
+                    lastProcessedEventTime = eventTime
                 }
             }
 
-            // If user switched to a different app, end time-limited session
-            if (recentApp != null && timeLimitedSession != null &&
-                timeLimitedSession!!.packageName != recentApp.packageName) {
-                Log.e(TAG, "User switched app from ${timeLimitedSession!!.packageName} to ${recentApp.packageName}, ending time-limited session")
-                timeLimitedSession = null
-                updateNotification()
-            }
-
-            // If user switched to a non-monitored app, end time-limited session
-            if (recentApp != null && !selectedApps.contains(recentApp.packageName)) {
-                Log.e(TAG, "User switched to non-monitored app ${recentApp.packageName}, ending time-limited session")
-                timeLimitedSession = null
-                updateNotification()
-            }
-
-            // Check if there's an active time-limited session for current app
-            val hasActiveTimeLimit = timeLimitedSession != null &&
-                recentApp != null &&
-                timeLimitedSession!!.packageName == recentApp.packageName
-            Log.d(TAG, "hasActiveTimeLimit: $hasActiveTimeLimit, lastCheckedApp: $lastCheckedApp, isDelayScreenActive: $isDelayScreenActive")
-
-            if (recentApp != null &&
-                selectedApps.contains(recentApp.packageName) &&
-                recentApp.packageName != lastCheckedApp &&
-                !isDelayScreenActive &&
-                !hasActiveTimeLimit
-            ) {
-                Log.d(TAG, "SHOWING POPUP for ${recentApp.packageName}")
-                lastCheckedApp = recentApp.packageName
-                isDelayScreenActive = true
-
-                // Show delay screen
-                showDelayScreen(recentApp.packageName)
-            } else {
-                if (recentApp != null && selectedApps.contains(recentApp.packageName)) {
-                    Log.d(TAG, "Popup NOT shown for ${recentApp.packageName} - isLastChecked: ${recentApp.packageName == lastCheckedApp}, delayActive: $isDelayScreenActive, hasTimeLimit: $hasActiveTimeLimit")
+            if (currentForegroundPackage != null && !selectedApps.contains(currentForegroundPackage)) {
+                timeLimitedSession?.let { session ->
+                    if (session.packageName != currentForegroundPackage) {
+                        Log.e(TAG, "User switched to non-monitored app, ending time-limited session")
+                        cancelTimeExpirationAlarm()
+                        timeLimitedSession = null
+                        updateNotification()
+                    }
                 }
             }
 
@@ -353,7 +391,7 @@ class AppMonitorService : Service() {
         }
     }
 
-    private fun showTimeExpiredScreen(session: SessionData) {
+    fun showTimeExpiredScreen(session: SessionData) {
         try {
             val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             val timeExpiredMessage = prefs.getString("flutter.time_expired_message", "Your time is up! How much more time do you need?")
@@ -386,6 +424,7 @@ class AppMonitorService : Service() {
                 packageName = packageName,
                 appName = appName
             )
+            setTimeExpirationAlarm(timeLimitMinutes)
             Log.e(TAG, "CREATED time-limited session: appName=$appName, timeLimit=$timeLimitMinutes, package=$packageName")
             updateNotification()
             Log.e(TAG, "Started time-limited session for $appName: $timeLimitMinutes minutes")
@@ -430,6 +469,7 @@ class AppMonitorService : Service() {
                     Log.d(TAG, "EXTEND_TIME received")
                     timeLimitedSession?.apply {
                         timeLimitMinutes += 1
+                        setTimeExpirationAlarm(timeLimitMinutes)
                         Log.e(TAG, "EXTENDED time for $appName by 1 minute: $timeLimitMinutes minutes total")
                         updateNotification()
                     } ?: run {
@@ -446,6 +486,7 @@ class AppMonitorService : Service() {
                         timeLimitedSession?.apply {
                             timeLimitMinutes = extraMinutes
                             startTime = System.currentTimeMillis()
+                            setTimeExpirationAlarm(timeLimitMinutes)
                             Log.e(TAG, "EXTENDED time for $appName: $timeLimitMinutes minutes")
                             updateNotification()
                         }
@@ -463,7 +504,7 @@ class AppMonitorService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Error registering clearStuckStateReceiver: ${e.message}", e)
         }
-        
+
         try {
             val timeExpiredFilter = IntentFilter().apply {
                 addAction("com.example.extra_mind_time.EXTEND_TIME")
@@ -474,6 +515,8 @@ class AppMonitorService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Error registering timeExpiredReceiver: ${e.message}", e)
         }
+
+        Log.d(TAG, "TimeExpirationReceiver registered in manifest")
     }
 
     private fun unregisterDelayScreenReceiver() {
@@ -488,6 +531,30 @@ class AppMonitorService : Service() {
             Log.d(TAG, "timeExpiredReceiver unregistered")
         } catch (e: Exception) {
             Log.e(TAG, "Error unregistering timeExpiredReceiver: ${e.message}")
+        }
+        Log.d(TAG, "TimeExpirationReceiver is registered in manifest, no need to unregister")
+    }
+}
+
+class TimeExpirationReceiver : BroadcastReceiver() {
+    private val TAG = "TimeExpirationReceiver"
+
+    override fun onReceive(context: Context?, intent: Intent?) {
+        if (intent?.action == "com.example.extra_mind_time.TIME_EXPIRED") {
+            Log.d(TAG, "Time expiration alarm fired")
+
+            val service = AppMonitorService.getInstance()
+            service?.let {
+                it.timeLimitedSession?.let { session ->
+                    Log.e(TAG, "Time limit expired for ${session.packageName}")
+                    it.cancelTimeExpirationAlarm()
+                    it.showTimeExpiredScreen(session)
+                    it.timeLimitedSession = null
+                    it.updateNotification()
+                } ?: run {
+                    Log.e(TAG, "No active session when time expiration fired")
+                }
+            }
         }
     }
 }
