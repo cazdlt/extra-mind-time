@@ -98,6 +98,8 @@ class AppMonitorService : Service() {
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setShowWhen(false)
             .build()
     }
 
