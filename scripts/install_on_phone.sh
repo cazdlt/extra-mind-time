@@ -51,7 +51,28 @@ flutter build apk --release
 echo ""
 echo "📦 Installing APK..."
 echo "================================"
-flutter install -d "$DEVICE_ID"
+
+# Re-check for devices after build
+echo "🔍 Checking for connected devices..."
+ADB_DEVICES=$(adb devices | grep -v "List of devices" | grep "device$")
+
+if [ -z "$ADB_DEVICES" ]; then
+    echo "❌ No connected devices found. Make sure phone is still connected and USB debugging is active."
+    exit 1
+fi
+
+# Get the first device ID
+DEVICE_ID=$(echo "$ADB_DEVICES" | head -1 | awk '{print $1}')
+echo "✅ Using device: $DEVICE_ID"
+
+# Install APK using adb
+APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+
+echo "🔄 Uninstalling existing version (if any)..."
+adb -s "$DEVICE_ID" uninstall com.example.extra_mind_time 2>/dev/null || true
+
+echo "📦 Installing new version..."
+adb -s "$DEVICE_ID" install "$APK_PATH"
 
 echo ""
 echo "✅ Installation complete!"
