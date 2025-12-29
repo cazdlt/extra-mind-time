@@ -32,6 +32,8 @@ class AppMonitorService : Service() {
     private var monitoringRunnable: Runnable? = null
     private var lastProcessedEventTime: Long = 0
     private var isDelayScreenActive = false
+    private var currentDelayPackage: String? = null
+    private var delayScreenStartTime: Long = 0
     var timeLimitedSession: SessionData? = null
     private var notificationUpdateRunnable: Runnable? = null
     private var alarmManager: AlarmManager? = null
@@ -40,7 +42,7 @@ class AppMonitorService : Service() {
     companion object {
         const val ACTION_START_MONITORING = "com.example.extra_mind_time.START_MONITORING"
         const val ACTION_STOP_MONITORING = "com.example.extra_mind_time.STOP_MONITORING"
-        private const val CHECK_INTERVAL = 2000L // Check for new events every 2 seconds
+        private const val CHECK_INTERVAL = 1000L // Check for new events every 1 second
         private const val NOTIFICATION_UPDATE_INTERVAL = 1000L
 
         @Volatile
@@ -69,31 +71,58 @@ class AppMonitorService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_START_MONITORING -> {
+        Log.d(TAG, "onStartCommand with action: ${intent?.action}")
+        
+        try {
+            if (intent == null) {
+                val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                val isMonitoring = prefs.getBoolean("flutter.is_monitoring", false)
+                if (isMonitoring) {
+                    Log.d(TAG, "OS restarted service and monitoring is enabled, resuming")
+                    startForegroundService()
+                    startMonitoring()
+                } else {
+                    Log.d(TAG, "OS restarted service but monitoring is disabled, stopping")
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+            } else if (intent.action == ACTION_START_MONITORING) {
                 startForegroundService()
                 startMonitoring()
-            }
-
-            ACTION_STOP_MONITORING -> {
+            } else if (intent.action == ACTION_STOP_MONITORING) {
                 stopMonitoring()
                 stopSelf()
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start foreground service: ${e.message}")
+            // On Android 15+, if we can't start foreground, we might need to stop ourselves
+            // to prevent the "app keeps failing" message.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                stopSelf()
+            }
         }
+        
         return START_STICKY
     }
 
     private fun startForegroundService() {
-        val notification = createNotification()
+        try {
+            val notification = createNotification()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { // API 34
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in startForegroundService: ${e.message}")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                stopSelf()
+            }
         }
     }
 
@@ -116,8 +145,12 @@ class AppMonitorService : Service() {
     }
 
     private fun createNotification(): Notification {
-        val intent = packageManager.getLaunchIntentForPackage(packageName)
-        val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+        val pendingIntent = if (launchIntent != null) {
+            PendingIntent.getActivity(this, 0, launchIntent, PendingIntent.FLAG_IMMUTABLE)
+        } else {
+            null
+        }
 
         Log.d(TAG, "createNotification - timeLimitedSession: ${timeLimitedSession?.appName}")
 
@@ -178,9 +211,15 @@ class AppMonitorService : Service() {
     }
 
     private fun startMonitoring() {
-        lastProcessedEventTime = System.currentTimeMillis()
-        stopMonitoring()
-
+        if (monitoringRunnable != null) {
+            Log.d(TAG, "Monitoring already running, just updating state")
+            updateNotification()
+            return
+        }
+        
+        Log.d(TAG, "=== startMonitoring called ===")
+        lastProcessedEventTime = System.currentTimeMillis() - 10000L // Look back 10 seconds initially
+        
         monitoringRunnable =
             object : Runnable {
                 override fun run() {
@@ -200,6 +239,7 @@ class AppMonitorService : Service() {
         notificationUpdateRunnable?.let { handler?.removeCallbacks(it) }
         cancelTimeExpirationAlarm()
         isDelayScreenActive = false
+        currentDelayPackage = null
         timeLimitedSession = null
         updateNotification()
         unregisterDelayScreenReceiver()
@@ -219,20 +259,45 @@ class AppMonitorService : Service() {
         )
 
         alarmManager?.let {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                it.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    expirationTime,
-                    timeExpirationPendingIntent!!
-                )
-            } else {
-                it.setExact(
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (it.canScheduleExactAlarms()) {
+                        it.setExactAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP,
+                            expirationTime,
+                            timeExpirationPendingIntent!!
+                        )
+                    } else {
+                        Log.w(TAG, "Cannot schedule exact alarms, falling back to setWindow")
+                        it.setWindow(
+                            AlarmManager.RTC_WAKEUP,
+                            expirationTime,
+                            10000, // 10s window
+                            timeExpirationPendingIntent!!
+                        )
+                    }
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    it.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        expirationTime,
+                        timeExpirationPendingIntent!!
+                    )
+                } else {
+                    it.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        expirationTime,
+                        timeExpirationPendingIntent!!
+                    )
+                }
+                Log.d(TAG, "Time expiration alarm set for $timeLimitMinutes minutes from now")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to set exact alarm, falling back to set(): ${e.message}")
+                it.set(
                     AlarmManager.RTC_WAKEUP,
                     expirationTime,
                     timeExpirationPendingIntent!!
                 )
             }
-            Log.d(TAG, "Time expiration alarm set for $timeLimitMinutes minutes from now")
         }
     }
 
@@ -254,6 +319,7 @@ class AppMonitorService : Service() {
             }
 
             val selectedApps = parseJsonArray(selectedAppsJson)
+            Log.d(TAG, "Selected apps to monitor: $selectedApps")
 
             if (selectedApps.isEmpty()) {
                 return
@@ -262,71 +328,102 @@ class AppMonitorService : Service() {
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val currentTime = System.currentTimeMillis()
 
-            val usageEvents = usageStatsManager.queryEvents(lastProcessedEventTime, currentTime)
+            // Query from last event time to currentTime. We will filter out duplicates manually.
+            val startTime = if (lastProcessedEventTime > 0) lastProcessedEventTime else currentTime - 10000
+            val usageEvents = usageStatsManager.queryEvents(startTime, currentTime)
+            
+            Log.d(TAG, "Checking events from $startTime to $currentTime (lastProcessed: $lastProcessedEventTime)")
 
             if (usageEvents == null) {
+                Log.d(TAG, "No events returned from UsageStatsManager")
                 return
             }
 
-            var currentForegroundPackage: String? = null
             val event = UsageEvents.Event()
+            var eventCount = 0
 
             while (usageEvents.hasNextEvent()) {
                 usageEvents.getNextEvent(event)
-
+                val eventTime = event.timeStamp
+                
+                // Skip events we've already processed
+                if (eventTime <= lastProcessedEventTime && lastProcessedEventTime > 0) {
+                    continue
+                }
+                
+                eventCount++
                 val packageName = event.packageName
                 val eventType = event.eventType
-                val eventTime = event.timeStamp
+                
+                Log.v(TAG, "Event: pkg=$packageName, type=$eventType, time=$eventTime")
 
                 if (packageName == this.packageName) {
+                    if (eventType == UsageEvents.Event.MOVE_TO_BACKGROUND) {
+                        Log.d(TAG, "Monitoring app moved to background. Clearing delay flag.")
+                        isDelayScreenActive = false
+                    }
+                    lastProcessedEventTime = eventTime
                     continue
                 }
 
                 if (eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) {
                     Log.d(TAG, "App moved to foreground: $packageName at $eventTime")
-                    currentForegroundPackage = packageName
 
-                    if (selectedApps.contains(packageName)) {
-                        val hasActiveTimeLimit = timeLimitedSession != null &&
-                            timeLimitedSession!!.packageName == packageName
-
-                        if (!isDelayScreenActive && !hasActiveTimeLimit) {
-                            Log.d(TAG, "SHOWING POPUP for $packageName")
-                            isDelayScreenActive = true
-                            showDelayScreen(packageName)
-                        } else if (hasActiveTimeLimit) {
-                            Log.d(TAG, "Popup NOT shown - active time limit for $packageName")
-                        } else if (isDelayScreenActive) {
-                            Log.d(TAG, "Popup NOT shown - delay screen active for $packageName")
-                        }
-                    }
-                } else if (eventType == UsageEvents.Event.MOVE_TO_BACKGROUND) {
-                    Log.d(TAG, "App moved to background: $packageName at $eventTime")
-
+                    // Handle session ending when switching apps
                     timeLimitedSession?.let { session ->
-                        if (session.packageName == packageName) {
-                            Log.e(TAG, "User switched from ${session.packageName}, ending time-limited session")
+                        if (session.packageName != packageName) {
+                            Log.e(TAG, "User switched to DIFFERENT app: $packageName (current session: ${session.packageName}), ending session")
                             cancelTimeExpirationAlarm()
                             timeLimitedSession = null
                             updateNotification()
                         }
                     }
-                }
 
-                if (eventTime > lastProcessedEventTime) {
-                    lastProcessedEventTime = eventTime
-                }
-            }
+                    if (selectedApps.contains(packageName)) {
+                        val hasActiveTimeLimit = timeLimitedSession != null &&
+                            timeLimitedSession!!.packageName == packageName
 
-            if (currentForegroundPackage != null && !selectedApps.contains(currentForegroundPackage)) {
-                timeLimitedSession?.let { session ->
-                    if (session.packageName != currentForegroundPackage) {
-                        Log.e(TAG, "User switched to non-monitored app, ending time-limited session")
-                        cancelTimeExpirationAlarm()
-                        timeLimitedSession = null
-                        updateNotification()
+                        // If delay screen is active for a DIFFERENT package, we should allow the new popup
+                        if (isDelayScreenActive && currentDelayPackage != packageName) {
+                            Log.d(TAG, "New monitored app $packageName detected while delay screen was active for $currentDelayPackage. Resetting delay state.")
+                            isDelayScreenActive = false
+                        }
+
+                        if (isDelayScreenActive) {
+                            val timeSinceDelayStarted = System.currentTimeMillis() - delayScreenStartTime
+                            if (timeSinceDelayStarted > 60000) { // 1 minute timeout
+                                Log.w(TAG, "Delay screen seems stuck (active for ${timeSinceDelayStarted}ms), resetting state")
+                                isDelayScreenActive = false
+                            }
+                        }
+
+                        if (!isDelayScreenActive && !hasActiveTimeLimit) {
+                            Log.d(TAG, "SHOWING POPUP for $packageName")
+                            isDelayScreenActive = true
+                            currentDelayPackage = packageName
+                            delayScreenStartTime = System.currentTimeMillis()
+                            showDelayScreen(packageName)
+                        } else if (hasActiveTimeLimit) {
+                            Log.d(TAG, "Popup NOT shown - active time limit for $packageName")
+                        } else if (isDelayScreenActive && currentDelayPackage == packageName) {
+                            Log.d(TAG, "Popup NOT shown - delay screen ALREADY active for $packageName")
+                        }
+                    } else if (packageName != this.packageName) {
+                        // A non-monitored app (like the Launcher) came to foreground.
+                        // If we had a delay screen active, it is no longer visible to the user.
+                        if (isDelayScreenActive) {
+                            Log.d(TAG, "Non-monitored app $packageName came to foreground. Clearing delay state.")
+                            isDelayScreenActive = false
+                            currentDelayPackage = null
+                        }
                     }
                 }
+
+                lastProcessedEventTime = eventTime
+            }
+            
+            if (eventCount > 0) {
+                Log.d(TAG, "Processed $eventCount new events. Updated lastProcessedEventTime to $lastProcessedEventTime")
             }
 
         } catch (e: Exception) {
@@ -335,6 +432,7 @@ class AppMonitorService : Service() {
     }
 
     private fun parseJsonArray(json: String): List<String> {
+        Log.d(TAG, "Parsing JSON array: $json")
         return try {
             val gson = com.google.gson.Gson()
             val stringArray = gson.fromJson(json, Array<String>::class.java)
@@ -391,7 +489,7 @@ class AppMonitorService : Service() {
     fun showTimeExpiredScreen(session: SessionData) {
         try {
             val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-            val timeExpiredMessage = prefs.getString("flutter.time_expired_message", "Your time is up! How much more time do you need?")
+            val timeExpiredMessage = prefs.getString("flutter.time_expired_message", "Your mindful time is complete. How much more time would you like?")
 
             val intent =
                 Intent(this, TimeExpiredActivity::class.java).apply {
@@ -411,8 +509,9 @@ class AppMonitorService : Service() {
 
     fun onDelayScreenFinished(packageName: String?, appName: String?, timeLimitMinutes: Int, isStayingMindful: Boolean) {
         Log.d(TAG, "=== onDelayScreenFinished called directly: packageName=$packageName, appName=$appName, timeLimit=$timeLimitMinutes, isStayingMindful=$isStayingMindful ===")
-
+ 
         isDelayScreenActive = false
+        currentDelayPackage = null
 
         if (packageName != null && timeLimitMinutes > 0 && appName != null) {
             timeLimitedSession = SessionData(
@@ -446,6 +545,7 @@ class AppMonitorService : Service() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == "com.example.extra_mind_time.CLEAR_STUCK_STATE") {
                 isDelayScreenActive = false
+                currentDelayPackage = null
                 Log.d(TAG, "Stuck state cleared via broadcast")
             }
         }
@@ -490,7 +590,11 @@ class AppMonitorService : Service() {
     private fun registerDelayScreenReceiver() {
         try {
             val clearStuckFilter = IntentFilter("com.example.extra_mind_time.CLEAR_STUCK_STATE")
-            registerReceiver(clearStuckStateReceiver, clearStuckFilter, Context.RECEIVER_EXPORTED)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(clearStuckStateReceiver, clearStuckFilter, Context.RECEIVER_EXPORTED)
+            } else {
+                registerReceiver(clearStuckStateReceiver, clearStuckFilter)
+            }
             Log.d(TAG, "clearStuckStateReceiver registered successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error registering clearStuckStateReceiver: ${e.message}", e)
@@ -501,7 +605,11 @@ class AppMonitorService : Service() {
                 addAction("com.example.extra_mind_time.EXTEND_TIME")
                 addAction("com.example.extra_mind_time.TIME_LIMIT_EXTENDED")
             }
-            registerReceiver(timeExpiredReceiver, timeExpiredFilter, Context.RECEIVER_EXPORTED)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(timeExpiredReceiver, timeExpiredFilter, Context.RECEIVER_EXPORTED)
+            } else {
+                registerReceiver(timeExpiredReceiver, timeExpiredFilter)
+            }
             Log.d(TAG, "timeExpiredReceiver registered successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error registering timeExpiredReceiver: ${e.message}", e)

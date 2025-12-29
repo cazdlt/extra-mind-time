@@ -1,6 +1,6 @@
 # AGENTS.md - Extra Mind Time Development Guide
 
-Flutter + Kotlin Android app for mindful app usage with delay screens and configurable time limits. API 22+.
+Flutter + Kotlin Android app for mindful app usage with delay screens and configurable time limits. API 22+. Optimized for Android 15.
 
 ## Quick Commands
 ```bash
@@ -19,7 +19,7 @@ flutter build apk --release # Release build
 - **Flutter** (`lib/`): UI, settings, app selection
 - **Kotlin** (`android/.../extra_mind_time/`): Foreground service, event-driven app monitoring (UsageEvents), AlarmManager for precise time expiration
 - **Screens**: permissions → home → app_selection/settings
-- **Services**: `AppMonitorService.kt` (event-driven monitoring via UsageEvents, AlarmManager for precise expiration), `DelayActivity.kt` (delay screen), `TimeExpiredActivity.kt` (time expired screen), `TimeExpirationReceiver` (broadcast receiver for AlarmManager)
+- **Services**: `AppMonitorService.kt` (event-driven monitoring via UsageEvents, AlarmManager for precise expiration), `DelayActivity.kt` (delay screen), `TimeExpiredActivity.kt` (time expired screen), `TimeExpirationReceiver` (broadcast receiver for AlarmManager), `BootReceiver.kt` (start-on-boot support)
 
 ## Critical Patterns
 
@@ -77,6 +77,14 @@ prefs.getString("flutter.time_expired_message", null)
 - `EXTEND_TIME`: User clicked +1 min in countdown notification
   - No extras
   - Action: Adds 1 minute to current time limit
+- `CLEAR_STUCK_STATE`: Sent by activities when destroyed to ensure service monitoring state is consistent
+
+## Android 15 & Reliability
+- **Exact Alarms**: Uses `SCHEDULE_EXACT_ALARM` with runtime check `canScheduleExactAlarms()` and fallback to inexact alarms.
+- **Service Type**: Uses `FOREGROUND_SERVICE_TYPE_SPECIAL_USE` for API 34+ compliance.
+- **Persistence**: `START_STICKY` in `onStartCommand` and `BootReceiver` ensure service stays running or restarts after reboot/crash.
+- **Monitoring**: 1000ms interval with 10s look-back window and `lastEventTime + 1` logic to prevent missed events while avoiding duplicates.
+- **Lifecycle**: `DelayActivity` and `TimeExpiredActivity` finish themselves in `onStop` to ensure they don't block subsequent launches.
 
 ## Code Conventions
 - **Dart**: camelCase variables, PascalCase classes, StatefulWidget with setState(), Material 3, no comments
@@ -85,27 +93,9 @@ prefs.getString("flutter.time_expired_message", null)
 ## Git Operations
 - **NEVER commit automatically** unless explicitly asked by the user
 - Let the user handle all git operations (add, commit, push, etc.) unless specifically instructed
-- If you make changes, just complete the task and let the user decide when/what to commit
 
 ## Key Constants
-- Check interval: 2000ms
+- Check interval: 1000ms
 - Delay range: 1-30 seconds (default: 5)
 - Time limit options: Default [2, 5, 10] minutes (configurable, max 3 options from [2,5,10,15,20,30])
 - Countdown format: MM:SS (e.g., "2:30 remaining")
-
-## File Structure
-```
-lib/
-  main.dart → screens/ (permissions, home, app_selection, settings) → services/ (app_monitor_service.dart)
-android/.../extra_mind_time/
-  MainActivity.kt → AppMonitorService.kt → DelayActivity.kt → TimeExpiredActivity.kt
-```
-
-## Common Issues
-- **Delay not showing**: Check SYSTEM_ALERT_WINDOW permission, verify monitoring active, check `adb logcat -s AppMonitorService`
-- **Monitoring not starting**: Verify all permissions granted, check PACKAGE_USAGE_STATS in Android Settings, disable battery optimization
-- **Build failures**: `flutter clean && flutter pub get`
-- **Countdown not updating**: Check logcat for notification update errors, ensure service is still running
-- **Session ending unexpectedly**: Normal behavior - switching apps ends the current session (intentional design)
-- **App switches not detected**: UsageEvents may have delay on some devices - check logcat for event processing
-- **TimeExpirationReceiver manifest registration**: Must be a class (not object) with public default constructor. Cannot use `const` inside class, use `val` instead.

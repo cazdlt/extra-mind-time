@@ -197,7 +197,7 @@ class DelayActivity : Activity() {
         // Info text
         val infoTextView =
             TextView(this).apply {
-                text = "Take this moment to reflect"
+                text = "Take a deep breath"
                 textSize = 14f
                 setTextColor(0xB3FFFFFF.toInt())
                 gravity = android.view.Gravity.CENTER
@@ -206,26 +206,8 @@ class DelayActivity : Activity() {
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                     )
-                fontFeatureSettings = "smcp"
             }
         rootLayout.addView(infoTextView)
-
-        // Recheck interval info
-        val recheckIntervalMinutes = intent.getLongExtra("recheckIntervalMinutes", 30)
-        val intervalTextView =
-            TextView(this).apply {
-                text = "Next reminder in ${recheckIntervalMinutes} minutes"
-                textSize = 12f
-                setTextColor(0x99FFFFFF.toInt())
-                gravity = android.view.Gravity.CENTER
-                layoutParams =
-                    LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    )
-                        .apply { topMargin = 8 }
-            }
-        rootLayout.addView(intervalTextView)
 
         // Buttons container
         val buttonsLayout =
@@ -403,6 +385,18 @@ class DelayActivity : Activity() {
         startActivity(homeIntent)
         notifyDelayScreenFinished(isContinue = false)
         finish()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Ensure timer is cancelled and activity is finished when user leaves (Home button, etc.)
+        // so that it starts fresh next time.
+        android.util.Log.d("DelayActivity", "onStop called, cancelling timer and finishing activity")
+        countDownTimer?.cancel()
+        notifyDelayScreenFinished(isContinue = false)
+        if (!isFinishing) {
+            finish()
+        }
     }
 
     override fun onDestroy() {

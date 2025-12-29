@@ -52,7 +52,6 @@ class _HomeScreenState extends State<HomeScreen> {
         "Take a moment to breathe and be present.";
     final backgroundColorValue =
         prefs.getInt('background_color') ?? Colors.deepPurple.toARGB32();
-    final recheckInterval = prefs.getInt('recheck_interval_minutes') ?? 30;
     final timeLimitOptionsJson = prefs.getString('time_limit_options');
     final timeLimitOptions = timeLimitOptionsJson != null
         ? List<int>.from(json.decode(timeLimitOptionsJson))

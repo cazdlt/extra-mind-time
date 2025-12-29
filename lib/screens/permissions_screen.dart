@@ -15,6 +15,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
   bool _usageStatsGranted = false;
   bool _overlayGranted = false;
   bool _notificationGranted = false;
+  bool _exactAlarmGranted = false;
   bool _isChecking = false;
 
   @override
@@ -30,14 +31,21 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
     final overlay = await Permission.systemAlertWindow.isGranted;
     final notification = await Permission.notification.isGranted;
 
+    // Check exact alarm permission (required for Android 12+)
+    final exactAlarm = await Permission.scheduleExactAlarm.isGranted;
+
     setState(() {
       _usageStatsGranted = usageStats;
       _overlayGranted = overlay;
       _notificationGranted = notification;
+      _exactAlarmGranted = exactAlarm;
       _isChecking = false;
     });
 
-    if (_usageStatsGranted && _overlayGranted && _notificationGranted) {
+    if (_usageStatsGranted &&
+        _overlayGranted &&
+        _notificationGranted &&
+        _exactAlarmGranted) {
       widget.onPermissionsGranted();
     }
   }
@@ -53,6 +61,11 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
         );
       }
     }
+  }
+
+  Future<void> _requestExactAlarmPermission() async {
+    await Permission.scheduleExactAlarm.request();
+    await _checkAllPermissions();
   }
 
   Future<void> _requestOverlayPermission() async {
@@ -134,10 +147,19 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                     isGranted: _notificationGranted,
                     onRequest: _requestNotificationPermission,
                   ),
+                  const SizedBox(height: 16),
+                  _buildPermissionCard(
+                    icon: Icons.alarm,
+                    title: 'Exact Alarms',
+                    description: 'Required for precise time limit tracking',
+                    isGranted: _exactAlarmGranted,
+                    onRequest: _requestExactAlarmPermission,
+                  ),
                   const SizedBox(height: 32),
                   if (_usageStatsGranted &&
                       _overlayGranted &&
-                      _notificationGranted)
+                      _notificationGranted &&
+                      _exactAlarmGranted)
                     ElevatedButton(
                       onPressed: widget.onPermissionsGranted,
                       style: ElevatedButton.styleFrom(

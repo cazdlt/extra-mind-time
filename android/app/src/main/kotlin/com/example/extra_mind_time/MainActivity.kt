@@ -46,10 +46,14 @@ class MainActivity : FlutterActivity() {
                 action = AppMonitorService.ACTION_START_MONITORING
             }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to start monitoring service: ${e.message}")
         }
     }
 
@@ -58,6 +62,10 @@ class MainActivity : FlutterActivity() {
             Intent(this, AppMonitorService::class.java).apply {
                 action = AppMonitorService.ACTION_STOP_MONITORING
             }
-        startService(intent)
+        try {
+            startService(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to stop monitoring service: ${e.message}")
+        }
     }
 }
