@@ -30,7 +30,6 @@ class AppMonitorService : Service() {
     private val TIME_EXPIRATION_REQUEST_CODE = 1002
     private var handler: Handler? = null
     private var monitoringRunnable: Runnable? = null
-    private var lastCheckedApp: String? = null
     private var lastProcessedEventTime: Long = 0
     private var isDelayScreenActive = false
     var timeLimitedSession: SessionData? = null
@@ -179,6 +178,7 @@ class AppMonitorService : Service() {
     }
 
     private fun startMonitoring() {
+        lastProcessedEventTime = System.currentTimeMillis()
         stopMonitoring()
 
         monitoringRunnable =
@@ -290,17 +290,14 @@ class AppMonitorService : Service() {
                         val hasActiveTimeLimit = timeLimitedSession != null &&
                             timeLimitedSession!!.packageName == packageName
 
-                        if (!isDelayScreenActive && !hasActiveTimeLimit && packageName != lastCheckedApp) {
+                        if (!isDelayScreenActive && !hasActiveTimeLimit) {
                             Log.d(TAG, "SHOWING POPUP for $packageName")
-                            lastCheckedApp = packageName
                             isDelayScreenActive = true
                             showDelayScreen(packageName)
                         } else if (hasActiveTimeLimit) {
                             Log.d(TAG, "Popup NOT shown - active time limit for $packageName")
                         } else if (isDelayScreenActive) {
                             Log.d(TAG, "Popup NOT shown - delay screen active for $packageName")
-                        } else {
-                            Log.d(TAG, "Popup NOT shown - last checked app same: $packageName")
                         }
                     }
                 } else if (eventType == UsageEvents.Event.MOVE_TO_BACKGROUND) {
@@ -433,13 +430,8 @@ class AppMonitorService : Service() {
         }
 
         if (isStayingMindful) {
-            lastCheckedApp?.let { app ->
-                Log.e(TAG, "User stayed mindful, not starting session for: $app")
-            }
+            Log.e(TAG, "User stayed mindful, not starting session")
         }
-
-        Log.d(TAG, "Resetting lastCheckedApp from $lastCheckedApp to null")
-        lastCheckedApp = null
     }
 
     override fun onDestroy() {
@@ -454,7 +446,6 @@ class AppMonitorService : Service() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == "com.example.extra_mind_time.CLEAR_STUCK_STATE") {
                 isDelayScreenActive = false
-                lastCheckedApp = null
                 Log.d(TAG, "Stuck state cleared via broadcast")
             }
         }

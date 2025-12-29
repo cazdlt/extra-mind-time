@@ -230,6 +230,8 @@ class TimeExpiredActivity : Activity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        val intent = Intent("com.example.extra_mind_time.CLEAR_STUCK_STATE")
+        sendBroadcast(intent)
     }
 
     override fun onBackPressed() {
